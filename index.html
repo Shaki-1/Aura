@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AURA</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="mode-voyager">
+  <div class="page-shell">
+    <header class="site-header">
+      <a class="brand overlay-target" href="#" aria-label="AURA home" data-overlay-label="UI ELEMENT" data-status-tag="Optimized">
+        AURA
+      </a>
+
+      <nav class="header-actions" aria-label="AURA controls">
+        <label class="control-pill mode-pill overlay-target" data-overlay-label="INTERACTION" data-status-tag="Target Boosted">
+          <select id="modeSelect" aria-label="Select accessibility mode">
+            <option value="voyager">The Voyager (Color Blind)</option>
+            <option value="guardian">The Guardian (Eye Strain)</option>
+            <option value="beacon">The Beacon (Low Vision)</option>
+          </select>
+        </label>
+
+        <button class="control-pill enforce-button overlay-target" id="enforcerButton" type="button" data-overlay-label="INTERACTION" data-status-tag="Target Boosted">
+          Simulate Aura Enforcer
+        </button>
+
+        <label class="control-pill toggle-control overlay-target" data-overlay-label="INTERACTION" data-status-tag="Target Boosted">
+          <input id="clarifyToggle" type="checkbox">
+          <span class="toggle-track" aria-hidden="true"></span>
+          <span>Clarify Content</span>
+        </label>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero-section" aria-labelledby="heroTitle">
+        <div class="hero-copy">
+          <span class="badge">Aura Enforcer | Alpha 0.1</span>
+
+          <h1 class="hero-title overlay-target" id="heroTitle" data-overlay-label="STRUCTURE" data-status-tag="Readable">
+            The Guardian of <span>Accessibility.</span>
+          </h1>
+
+          <p class="hero-description" id="heroDescription">
+            Intelligence that lives between your windows. Aura identifies, cleans, and fixes digital barriers in real-time, bringing inclusive experiences to every application on your machine.
+          </p>
+
+          <div class="hero-buttons">
+            <button class="primary-button overlay-target" type="button" data-overlay-label="INTERACTION" data-status-tag="Target Boosted">
+              Download for Windows
+            </button>
+            <button class="secondary-button overlay-target" type="button" data-overlay-label="INTERACTION" data-status-tag="Target Boosted">
+              Watch the Vision
+            </button>
+          </div>
+        </div>
+
+        <div class="scanner-stack">
+          <aside class="scanner-panel overlay-target" aria-label="Aura scanner status" data-overlay-label="UI ELEMENT" data-status-tag="Optimized">
+            <p>Scanning: <span id="scannerApp">Waiting</span></p>
+            <p>Fixes Applied: <span id="scannerFixes">0</span></p>
+            <p>Mode: <span id="scannerMode">IDLE</span></p>
+            <p>Profile: <span id="scannerProfile">Waiting</span></p>
+            <p>Privacy: <span id="scannerPrivacy">local-first</span></p>
+            <p class="privacy-note">Privacy mode: local-first. Screenshots are not captured, saved, or sent to AI.</p>
+          </aside>
+
+          <article class="report-panel" aria-label="Local Accessibility Report">
+            <h2>Local Accessibility Report</h2>
+            <p>Active app: <span id="reportApp">Waiting</span></p>
+            <p>Active profile: <span id="reportProfile">Waiting for scan</span></p>
+            <p>Screenshot sent to AI: <span id="reportScreenshot">false</span></p>
+            <p class="report-window">Window: <span id="reportWindow">Unknown window</span></p>
+            <ul id="reportIssues">
+              <li>Click Simulate Aura Enforcer to run a local scan.</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="lower-section overlay-target" aria-label="Universal Empowerment" data-overlay-label="STRUCTURE" data-status-tag="Semantic">
+        <p class="section-kicker">Universal Empowerment</p>
+        <div class="subtle-grid">
+          <article>
+            <h2>Visual Enforcement</h2>
+            <p>Auto-corrects low contrast, identifies unlabelled icons, and enlarges tiny touch targets.</p>
+          </article>
+          <article>
+            <h2>Aura Narrative</h2>
+            <p>A localized guidance layer that describes the screen as you move.</p>
+          </article>
+          <article>
+            <h2>Vision Core</h2>
+            <p>On-device assistance keeps private app content on your machine.</p>
+          </article>
+        </div>
+      </section>
+
+      <footer class="site-footer">
+        &copy; 2026 Aura Systems. Part of the Tworam Ecosystem.
+      </footer>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

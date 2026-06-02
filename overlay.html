@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AURA Overlay</title>
+  <link rel="stylesheet" href="overlay.css">
+</head>
+<body class="overlay-voyager">
+  <main class="overlay-root" aria-label="AURA accessibility overlay">
+    <div class="filter-layer"></div>
+    <div class="edge-frame"></div>
+    <div class="hint-zone hint-browser-toolbar">Browser toolbar: improve focus visibility</div>
+    <div class="hint-zone hint-browser-content">Page content: use zoom or reader mode</div>
+    <div class="hint-zone hint-text-center">Text area: increase font size / contrast</div>
+    <div class="hint-zone hint-media-controls">Media controls: increase contrast / focus visibility</div>
+
+    <aside class="overlay-status" aria-label="AURA overlay status">
+      <p>AURA Enforcer Active</p>
+      <p>Mode: <span id="overlayMode">Voyager</span></p>
+      <p>Profile: <span id="overlayProfile">Default Accessibility Profile</span></p>
+    </aside>
+  </main>
+
+  <script src="overlay.js"></script>
+</body>
+</html>

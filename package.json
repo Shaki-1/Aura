@@ -1,0 +1,36 @@
+{
+  "name": "aura",
+  "version": "1.0.0",
+  "description": "AURA accessibility assistant prototype",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win portable"
+  },
+  "dependencies": {
+    "get-windows": "^9.3.0"
+  },
+  "devDependencies": {
+    "electron": "^42.3.1",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.aura.accessibility",
+    "productName": "AURA",
+    "files": [
+      "index.html",
+      "style.css",
+      "app.js",
+      "main.js",
+      "preload.js",
+      "overlay.html",
+      "overlay.css",
+      "overlay.js",
+      "active-window.ps1",
+      "package.json"
+    ],
+    "win": {
+      "target": "portable"
+    }
+  }
+}
