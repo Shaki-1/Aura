@@ -1,13 +1,29 @@
-const { app, BrowserWindow, ipcMain } = require("electron");
+const { app, BrowserWindow, ipcMain, globalShortcut } = require("electron");
 const { execFile } = require("child_process");
 const path = require("path");
 
 let mainWindow = null;
 let overlayWindow = null;
+const scriptBasePath = app.isPackaged
+  ? process.resourcesPath
+  : __dirname;
+const activeWindowScript = path.join(scriptBasePath, "active-window.ps1");
+const uiAutomationScript = path.join(scriptBasePath, "ui-automation-scan.ps1");
 let latestOverlayState = {
   mode: "voyager",
   profileName: "Default Accessibility Profile",
-  filterClass: "filter-default"
+  filterClass: "filter-default",
+  activeApp: "Waiting",
+  colorVisionProfile: "contrast-boost",
+  selectedColorVisionProfile: "contrast-boost",
+  eyeStrainProfile: "warm-comfort",
+  selectedEyeStrainProfile: "warm-comfort",
+  lowVisionProfile: "high-contrast",
+  selectedLowVisionProfile: "high-contrast",
+  filterIntensity: 60,
+  screenEnforcementActive: false,
+  scanStatus: "Waiting",
+  enforcementAreas: []
 };
 
 function createSafeScanError(errorMessage) {
@@ -35,15 +51,30 @@ function parsePowerShellJson(output) {
   return JSON.parse(output.slice(firstBrace, lastBrace + 1));
 }
 
+function createSafeUIScanError(errorMessage) {
+  return {
+    activeApp: "Unavailable",
+    windowTitle: "Unavailable",
+    privacyMode: "local-first",
+    screenshotSentToAI: false,
+    uiAutomationUsed: true,
+    elementCount: 0,
+    detectedIssues: [
+      "AURA could not inspect UI Automation metadata for the active window right now."
+    ],
+    enforcementAreas: [],
+    aiSafeSummary: "AURA UI Automation scan failed locally. No screenshots were captured, saved, uploaded, or sent to AI.",
+    error: errorMessage
+  };
+}
+
 // IPC lets the private main process run local Windows commands while the UI stays sandboxed.
 ipcMain.handle("scan-active-window", async () => {
-  const scriptPath = path.join(__dirname, "active-window.ps1");
-
   return new Promise((resolve) => {
     execFile(
       "powershell.exe",
-      ["-ExecutionPolicy", "Bypass", "-File", scriptPath],
-      { cwd: __dirname, windowsHide: true, timeout: 12000 },
+      ["-ExecutionPolicy", "Bypass", "-File", activeWindowScript],
+      { cwd: scriptBasePath, windowsHide: true, timeout: 12000 },
       (error, stdout, stderr) => {
         if (error) {
           resolve(createSafeScanError(stderr || error.message));
@@ -61,12 +92,41 @@ ipcMain.handle("scan-active-window", async () => {
   });
 });
 
+ipcMain.handle("scan-ui-automation", async () => {
+  return new Promise((resolve) => {
+    execFile(
+      "powershell.exe",
+      ["-ExecutionPolicy", "Bypass", "-File", uiAutomationScript],
+      { cwd: scriptBasePath, windowsHide: true, timeout: 18000 },
+      (error, stdout, stderr) => {
+        if (error) {
+          resolve(createSafeUIScanError(stderr || error.message));
+          return;
+        }
+
+        try {
+          const result = parsePowerShellJson(stdout);
+          resolve(result);
+        } catch (parseError) {
+          resolve(createSafeUIScanError(parseError.message));
+        }
+      }
+    );
+  });
+});
+
 function sendOverlayUpdate() {
   if (!overlayWindow || overlayWindow.isDestroyed()) {
     return;
   }
 
-  overlayWindow.webContents.send("overlay-state-updated", latestOverlayState);
+  if (overlayWindow.webContents.isLoading()) {
+    overlayWindow.webContents.once("did-finish-load", sendOverlayUpdate);
+    return;
+  }
+
+  console.log("Forwarding overlay update:", latestOverlayState);
+  overlayWindow.webContents.send("overlay-update", latestOverlayState);
 }
 
 function createOverlayWindow() {
@@ -89,7 +149,7 @@ function createOverlayWindow() {
 
   overlayWindow.setIgnoreMouseEvents(true);
   overlayWindow.setAlwaysOnTop(true, "screen-saver");
-  overlayWindow.loadFile("overlay.html");
+  overlayWindow.loadFile(path.join(__dirname, "overlay.html"));
 
   overlayWindow.webContents.once("did-finish-load", sendOverlayUpdate);
   overlayWindow.on("closed", () => {
@@ -120,7 +180,22 @@ ipcMain.handle("overlay-update", (_event, overlayState) => {
   latestOverlayState = {
     mode: overlayState?.mode || "voyager",
     profileName: overlayState?.profileName || "Default Accessibility Profile",
-    filterClass: overlayState?.filterClass || "filter-default"
+    filterClass: overlayState?.filterClass || "filter-default",
+    activeApp: overlayState?.activeApp || "Waiting",
+    colorVisionProfile: overlayState?.colorVisionProfile || "contrast-boost",
+    selectedColorVisionProfile: overlayState?.selectedColorVisionProfile || overlayState?.colorVisionProfile || "contrast-boost",
+    eyeStrainProfile: overlayState?.eyeStrainProfile || "warm-comfort",
+    selectedEyeStrainProfile: overlayState?.selectedEyeStrainProfile || overlayState?.eyeStrainProfile || "warm-comfort",
+    lowVisionProfile: overlayState?.lowVisionProfile || "high-contrast",
+    selectedLowVisionProfile: overlayState?.selectedLowVisionProfile || overlayState?.lowVisionProfile || "high-contrast",
+    filterIntensity: Number.isFinite(Number(overlayState?.filterIntensity))
+      ? Number(overlayState.filterIntensity)
+      : 60,
+    screenEnforcementActive: overlayState?.screenEnforcementActive === true,
+    scanStatus: overlayState?.scanStatus || "Waiting",
+    enforcementAreas: Array.isArray(overlayState?.enforcementAreas)
+      ? overlayState.enforcementAreas
+      : []
   };
 
   sendOverlayUpdate();
@@ -138,7 +213,7 @@ function createWindow() {
     }
   });
 
-  mainWindow.loadFile("index.html");
+  mainWindow.loadFile(path.join(__dirname, "index.html"));
   mainWindow.on("closed", () => {
     if (overlayWindow && !overlayWindow.isDestroyed()) {
       overlayWindow.close();
@@ -151,10 +226,23 @@ function createWindow() {
 app.whenReady().then(() => {
   createWindow();
   createOverlayWindow();
+  globalShortcut.register("CommandOrControl+Alt+A", () => {
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.hide();
+    }
+
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("emergency-stop");
+    }
+  });
 });
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();
   }
+});
+
+app.on("will-quit", () => {
+  globalShortcut.unregisterAll();
 });

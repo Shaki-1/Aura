@@ -10,15 +10,14 @@
   <main class="overlay-root" aria-label="AURA accessibility overlay">
     <div class="filter-layer"></div>
     <div class="edge-frame"></div>
-    <div class="hint-zone hint-browser-toolbar">Browser toolbar: improve focus visibility</div>
-    <div class="hint-zone hint-browser-content">Page content: use zoom or reader mode</div>
-    <div class="hint-zone hint-text-center">Text area: increase font size / contrast</div>
-    <div class="hint-zone hint-media-controls">Media controls: increase contrast / focus visibility</div>
+    <div class="enforcement-area-layer" id="enforcementAreaLayer" aria-hidden="true"></div>
 
     <aside class="overlay-status" aria-label="AURA overlay status">
       <p>AURA Enforcer Active</p>
+      <p>Status: <span id="overlayStatus">Waiting</span></p>
       <p>Mode: <span id="overlayMode">Voyager</span></p>
       <p>Profile: <span id="overlayProfile">Default Accessibility Profile</span></p>
+      <p>App: <span id="overlayApp">Waiting</span></p>
     </aside>
   </main>
 

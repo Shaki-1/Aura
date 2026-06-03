@@ -1,8 +1,8 @@
 :root {
   --overlay-opacity: 0.1;
+  --filter-intensity: 0.6;
   --frame-color: rgba(80, 156, 255, 0.52);
   --frame-opacity: 0.34;
-  --hint-color: rgba(80, 170, 255, 0.72);
   --status-border: rgba(109, 166, 255, 0.24);
   --status-bg: rgba(4, 9, 22, 0.46);
 }
@@ -24,79 +24,67 @@ body {
 
 .overlay-root,
 .filter-layer,
-.edge-frame {
+.edge-frame,
+.enforcement-area-layer {
   position: fixed;
   inset: 0;
   pointer-events: none;
 }
 
 .filter-layer {
-  opacity: var(--overlay-opacity);
+  opacity: calc(var(--overlay-opacity) * var(--filter-intensity));
 }
 
 .edge-frame {
   border: 2px solid var(--frame-color);
   box-shadow: inset 0 0 34px color-mix(in srgb, var(--frame-color) 45%, transparent);
-  opacity: var(--frame-opacity);
+  opacity: calc(var(--frame-opacity) * max(var(--filter-intensity), 0.3));
 }
 
-.hint-zone {
+.enforcement-area {
   position: fixed;
-  display: none;
-  max-width: 280px;
-  border: 1px solid var(--hint-color);
-  border-radius: 10px;
-  padding: 8px 10px;
-  color: rgba(246, 250, 255, 0.9);
-  background: rgba(5, 10, 22, 0.48);
-  box-shadow: 0 0 18px color-mix(in srgb, var(--hint-color) 28%, transparent);
-  font-size: 12px;
-  line-height: 1.35;
-  backdrop-filter: blur(10px);
-  pointer-events: none;
+  border: 2px solid color-mix(in srgb, var(--frame-color) 88%, white);
+  border-radius: 8px;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.28),
+    0 0 18px color-mix(in srgb, var(--frame-color) 58%, transparent);
+  opacity: calc(0.92 * max(var(--filter-intensity), 0.38));
 }
 
-.hint-browser-toolbar {
-  top: 34px;
-  left: 50%;
-  transform: translateX(-50%);
+.enforcement-area span {
+  position: absolute;
+  left: 0;
+  top: -22px;
+  max-width: 240px;
+  border: 1px solid color-mix(in srgb, var(--frame-color) 70%, white);
+  border-radius: 999px;
+  padding: 3px 8px;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.94);
+  background: rgba(2, 5, 15, 0.78);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--frame-color) 32%, transparent);
+  font-size: 10px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.hint-browser-content {
-  top: 28%;
-  left: 50%;
-  transform: translateX(-50%);
+.enforcement-area.severity-high {
+  border-width: 3px;
 }
 
-.hint-text-center {
-  top: 42%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-}
-
-.hint-media-controls {
-  left: 50%;
-  bottom: 84px;
-  transform: translateX(-50%);
-}
-
-.profile-browser .hint-browser-toolbar,
-.profile-browser .hint-browser-content,
-.profile-readability .hint-text-center,
-.profile-code .hint-text-center,
-.profile-terminal .hint-text-center,
-.profile-media .hint-media-controls {
-  display: block;
+.enforcement-area.severity-low {
+  opacity: calc(0.62 * max(var(--filter-intensity), 0.38));
 }
 
 .overlay-status {
   position: fixed;
   right: 32px;
   bottom: 32px;
-  max-width: 260px;
+  max-width: 220px;
   border: 1px solid var(--status-border);
   border-radius: 12px;
-  padding: 10px 12px;
+  padding: 9px 10px;
   color: rgba(245, 248, 255, 0.82);
   background: var(--status-bg);
   box-shadow: 0 0 20px rgba(45, 112, 255, 0.14);
@@ -105,35 +93,102 @@ body {
 
 .overlay-status p {
   margin: 0;
-  font-size: 11px;
-  line-height: 1.42;
+  font-size: 10.5px;
+  line-height: 1.35;
 }
 
 .overlay-status p:first-child {
-  margin-bottom: 4px;
+  margin-bottom: 5px;
   color: rgba(255, 255, 255, 0.92);
   font-weight: 800;
 }
 
+.overlay-status p + p {
+  margin-top: 2px;
+}
+
+.overlay-status span {
+  color: rgba(246, 249, 255, 0.94);
+  font-weight: 800;
+}
+
 .overlay-voyager {
-  --overlay-opacity: 0.18;
+  --overlay-opacity: 0.2;
   --frame-color: rgba(80, 174, 255, 0.56);
-  --frame-opacity: 0.32;
-  --hint-color: rgba(76, 198, 255, 0.72);
+  --frame-opacity: 0.36;
 }
 
 .overlay-voyager .filter-layer {
   background:
-    linear-gradient(90deg, rgba(25, 95, 210, 0.34), rgba(122, 86, 230, 0.18)),
-    radial-gradient(circle at 70% 40%, rgba(0, 220, 255, 0.16), transparent 38%);
-  mix-blend-mode: soft-light;
+    linear-gradient(90deg, rgba(23, 104, 235, 0.3), rgba(126, 88, 232, 0.16)),
+    radial-gradient(circle at 72% 42%, rgba(0, 225, 255, 0.14), transparent 38%);
+  mix-blend-mode: screen;
+}
+
+.overlay-voyager.color-protanopia {
+  --overlay-opacity: 0.24;
+  --frame-color: rgba(74, 170, 255, 0.72);
+}
+
+.overlay-voyager.color-protanopia .filter-layer {
+  background:
+    linear-gradient(90deg, rgba(0, 108, 255, 0.36), rgba(255, 218, 70, 0.18)),
+    rgba(0, 24, 68, 0.1);
+  mix-blend-mode: screen;
+}
+
+.overlay-voyager.color-deuteranopia {
+  --overlay-opacity: 0.24;
+  --frame-color: rgba(76, 188, 255, 0.72);
+}
+
+.overlay-voyager.color-deuteranopia .filter-layer {
+  background:
+    linear-gradient(90deg, rgba(0, 126, 255, 0.34), rgba(255, 143, 44, 0.18)),
+    rgba(0, 22, 58, 0.1);
+  mix-blend-mode: screen;
+}
+
+.overlay-voyager.color-tritanopia {
+  --overlay-opacity: 0.24;
+  --frame-color: rgba(54, 222, 255, 0.72);
+}
+
+.overlay-voyager.color-tritanopia .filter-layer {
+  background:
+    linear-gradient(90deg, rgba(26, 224, 255, 0.28), rgba(255, 70, 214, 0.2)),
+    rgba(32, 0, 68, 0.1);
+  mix-blend-mode: screen;
+}
+
+.overlay-voyager.color-achromatopsia {
+  --overlay-opacity: 0.26;
+  --frame-color: rgba(255, 255, 255, 0.82);
+}
+
+.overlay-voyager.color-achromatopsia .filter-layer {
+  background:
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.1) 0 1px, transparent 1px 10px),
+    rgba(0, 0, 0, 0.18);
+  mix-blend-mode: normal;
+}
+
+.overlay-voyager.color-contrast-boost {
+  --overlay-opacity: 0.24;
+  --frame-color: rgba(88, 171, 255, 0.78);
+}
+
+.overlay-voyager.color-contrast-boost .filter-layer {
+  background:
+    radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.16), transparent 40%),
+    linear-gradient(90deg, rgba(0, 92, 220, 0.3), rgba(126, 86, 230, 0.18));
+  mix-blend-mode: screen;
 }
 
 .overlay-guardian {
   --overlay-opacity: 0.34;
   --frame-color: rgba(158, 169, 226, 0.34);
   --frame-opacity: 0.2;
-  --hint-color: rgba(166, 176, 231, 0.46);
   --status-border: rgba(166, 176, 231, 0.2);
   --status-bg: rgba(15, 12, 15, 0.42);
 }
@@ -144,11 +199,58 @@ body {
     rgba(0, 0, 0, 0.16);
 }
 
+.overlay-guardian.eye-warm-comfort {
+  --overlay-opacity: 0.3;
+  --frame-color: rgba(230, 176, 116, 0.34);
+}
+
+.overlay-guardian.eye-warm-comfort .filter-layer {
+  background: rgba(255, 174, 92, 0.26);
+}
+
+.overlay-guardian.eye-dim-focus {
+  --overlay-opacity: 0.38;
+  --frame-opacity: 0.16;
+}
+
+.overlay-guardian.eye-dim-focus .filter-layer {
+  background: rgba(0, 0, 0, 0.34);
+}
+
+.overlay-guardian.eye-reduced-motion *,
+.overlay-guardian.eye-reduced-motion *::before,
+.overlay-guardian.eye-reduced-motion *::after {
+  animation-duration: 0.001ms !important;
+  transition-duration: 0.001ms !important;
+}
+
+.overlay-guardian.eye-soft-contrast {
+  --overlay-opacity: 0.24;
+  --frame-opacity: 0.12;
+}
+
+.overlay-guardian.eye-soft-contrast .filter-layer {
+  background:
+    linear-gradient(180deg, rgba(200, 210, 255, 0.1), rgba(20, 18, 28, 0.18)),
+    rgba(255, 255, 255, 0.02);
+}
+
+.overlay-guardian.eye-night-session {
+  --overlay-opacity: 0.42;
+  --frame-color: rgba(218, 142, 72, 0.28);
+  --frame-opacity: 0.18;
+}
+
+.overlay-guardian.eye-night-session .filter-layer {
+  background:
+    linear-gradient(180deg, rgba(255, 151, 64, 0.28), rgba(0, 0, 0, 0.32)),
+    rgba(0, 0, 0, 0.22);
+}
+
 .overlay-beacon {
   --overlay-opacity: 0.3;
   --frame-color: rgba(255, 190, 36, 0.86);
   --frame-opacity: 0.72;
-  --hint-color: rgba(255, 200, 56, 0.86);
   --status-border: rgba(255, 195, 45, 0.44);
   --status-bg: rgba(18, 13, 2, 0.54);
 }
@@ -164,4 +266,62 @@ body {
   box-shadow:
     inset 0 0 42px rgba(255, 180, 20, 0.32),
     0 0 18px rgba(255, 180, 20, 0.34);
+}
+
+.overlay-beacon.low-high-contrast {
+  --overlay-opacity: 0.34;
+  --frame-color: rgba(255, 210, 64, 0.9);
+  --frame-opacity: 0.78;
+}
+
+.overlay-beacon.low-high-contrast .filter-layer {
+  background:
+    radial-gradient(circle at 50% 45%, rgba(255, 255, 255, 0.1), transparent 38%),
+    rgba(0, 0, 0, 0.2);
+}
+
+.overlay-beacon.low-large-focus .edge-frame {
+  border-width: 8px;
+  box-shadow:
+    inset 0 0 54px rgba(255, 197, 38, 0.42),
+    0 0 24px rgba(255, 197, 38, 0.46);
+}
+
+.overlay-beacon.low-reading-support {
+  --overlay-opacity: 0.22;
+  --frame-opacity: 0.52;
+}
+
+.overlay-beacon.low-reading-support .filter-layer {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.14)),
+    rgba(255, 196, 45, 0.06);
+}
+
+.overlay-beacon.low-edge-guidance {
+  --overlay-opacity: 0.18;
+  --frame-opacity: 0.9;
+}
+
+.overlay-beacon.low-edge-guidance .edge-frame {
+  border-width: 7px;
+}
+
+.overlay-beacon.low-maximum-visibility {
+  --overlay-opacity: 0.38;
+  --frame-color: rgba(255, 220, 72, 0.96);
+  --frame-opacity: 0.94;
+}
+
+.overlay-beacon.low-maximum-visibility .filter-layer {
+  background:
+    radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.12), transparent 36%),
+    rgba(0, 0, 0, 0.26);
+}
+
+.overlay-beacon.low-maximum-visibility .edge-frame {
+  border-width: 8px;
+  box-shadow:
+    inset 0 0 68px rgba(255, 197, 38, 0.5),
+    0 0 32px rgba(255, 197, 38, 0.52);
 }

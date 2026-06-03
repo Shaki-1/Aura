@@ -1,26 +1,36 @@
-const modeSelect = document.querySelector("#modeSelect");
-const clarifyToggle = document.querySelector("#clarifyToggle");
-const enforcerButton = document.querySelector("#enforcerButton");
+const previewButton = document.querySelector("#previewButton");
+const testScanButton = document.querySelector("#testScanButton");
+const screenEnforcementButton = document.querySelector("#screenEnforcementButton");
+const emergencyStopButton = document.querySelector("#emergencyStopButton");
+const filterIntensityInput = document.querySelector("#filterIntensityInput");
+const filterIntensityValue = document.querySelector("#filterIntensityValue");
+const preferencesStatus = document.querySelector("#preferencesStatus");
+const selectedModeStatus = document.querySelector("#selectedModeStatus");
+const selectedProfileStatus = document.querySelector("#selectedProfileStatus");
+const screenStatus = document.querySelector("#screenStatus");
 const scannerMode = document.querySelector("#scannerMode");
 const scannerApp = document.querySelector("#scannerApp");
 const scannerFixes = document.querySelector("#scannerFixes");
-const scannerProfile = document.querySelector("#scannerProfile");
 const scannerPrivacy = document.querySelector("#scannerPrivacy");
-const heroTitle = document.querySelector("#heroTitle");
-const heroDescription = document.querySelector("#heroDescription");
-const reportApp = document.querySelector("#reportApp");
-const reportProfile = document.querySelector("#reportProfile");
-const reportScreenshot = document.querySelector("#reportScreenshot");
+const screenshotStatus = document.querySelector("#screenshotStatus");
+const enforcementAreaCount = document.querySelector("#enforcementAreaCount");
 const reportWindow = document.querySelector("#reportWindow");
 const reportIssues = document.querySelector("#reportIssues");
+const diagScanTime = document.querySelector("#diagScanTime");
+const diagScanType = document.querySelector("#diagScanType");
+const diagScanStatus = document.querySelector("#diagScanStatus");
+const diagActiveApp = document.querySelector("#diagActiveApp");
+const diagWindowTitle = document.querySelector("#diagWindowTitle");
+const diagIssueCount = document.querySelector("#diagIssueCount");
+const diagLastError = document.querySelector("#diagLastError");
+const diagRawResult = document.querySelector("#diagRawResult");
+const modeCards = document.querySelectorAll("[data-mode-card]");
+const colorProfileCards = document.querySelectorAll("[data-color-profile]");
+const eyeProfileCards = document.querySelectorAll("[data-eye-profile]");
+const lowProfileCards = document.querySelectorAll("[data-low-profile]");
 
-const originalTitle = 'The Guardian of <span>Accessibility.</span>';
-const clarifiedTitle = 'The Guardian for <span>everyone.</span>';
-const originalDescription = "Intelligence that lives between your windows. Aura identifies, cleans, and fixes digital barriers in real-time, bringing inclusive experiences to every application on your machine.";
-const clarifiedDescription = "Aura helps you use any app easily. It finds and fixes hard parts on your screen in real-time, keeping your data private.";
-
-// accessibilityProfiles are local rules. They adapt AURA based only on the active app name.
-// No screenshots, cloud AI, or screen content uploads are used to select these profiles.
+// accessibilityProfiles are local rules. They select support suggestions from the
+// active app name only, preserving privacy without screenshots or AI uploads.
 const accessibilityProfiles = {
   "Notepad.exe": {
     profileName: "Text Readability Profile",
@@ -46,7 +56,7 @@ const accessibilityProfiles = {
     suggestions: [
       "Increase page zoom if text is small.",
       "Use reader mode for dense pages.",
-      "Highlight important interactive elements."
+      "Improve focus visibility for links and controls."
     ]
   },
   "firefox.exe": {
@@ -126,17 +136,8 @@ const accessibilityProfiles = {
     filterClass: "filter-default",
     suggestions: [
       "Check contrast and spacing in this Windows app.",
-      "Highlight primary controls when enforcement is active.",
-      "Use local app-profile guidance without capturing screenshots."
-    ]
-  },
-  "SnippingTool.exe": {
-    profileName: "Capture Tool Guidance Profile",
-    filterClass: "filter-canvas",
-    suggestions: [
-      "Highlight capture mode controls.",
-      "Improve visibility around action buttons.",
-      "Keep guidance local without saving or sending screenshots."
+      "Use local app-profile guidance without capturing screenshots.",
+      "Apply the selected visual support overlay locally."
     ]
   }
 };
@@ -146,11 +147,33 @@ const defaultProfile = {
   filterClass: "filter-default",
   suggestions: [
     "Check contrast, font size, spacing, and motion for this app.",
-    "Highlight important controls when enforcement is active.",
-    "Use local accessibility rules when an app-specific profile is unavailable."
+    "Use the selected visual support overlay locally.",
+    "App-specific guidance can improve when a local profile is available."
   ]
 };
 
+const modeClasses = ["mode-voyager", "mode-guardian", "mode-beacon"];
+const colorVisionClasses = [
+  "color-protanopia",
+  "color-deuteranopia",
+  "color-tritanopia",
+  "color-achromatopsia",
+  "color-contrast-boost"
+];
+const eyeStrainClasses = [
+  "eye-warm-comfort",
+  "eye-dim-focus",
+  "eye-reduced-motion",
+  "eye-soft-contrast",
+  "eye-night-session"
+];
+const lowVisionClasses = [
+  "low-high-contrast",
+  "low-large-focus",
+  "low-reading-support",
+  "low-edge-guidance",
+  "low-maximum-visibility"
+];
 const profileFilterClasses = [
   "filter-readability",
   "filter-browser",
@@ -162,71 +185,41 @@ const profileFilterClasses = [
   "filter-default"
 ];
 
-// selectedMode stores the active inspection color profile from the dropdown.
+// selectedMode stores the chosen enforcement type from the cards.
 let selectedMode = "voyager";
 
-// clarifyContent controls the simplified copy and whether inspection overlays are visible.
-let clarifyContent = false;
+// selectedColorVisionProfile stores the Voyager support profile. It is not a diagnosis.
+let selectedColorVisionProfile = "contrast-boost";
 
-// enforcerEnabled controls the simulated enforcement state and the scanner mode text.
-let enforcerEnabled = false;
+let selectedEyeStrainProfile = "warm-comfort";
+let selectedLowVisionProfile = "high-contrast";
+let filterIntensity = 60;
+
+// previewActive applies visual adaptation classes only inside the AURA app.
+let previewActive = false;
+
+// screenEnforcementActive controls the real click-through overlayWindow and local scans.
+let screenEnforcementActive = false;
 
 let currentApp = "Waiting";
-let fixesApplied = 0;
-let latestReport = null;
 let activeProfile = defaultProfile;
 
-// latestIssues stores the local PowerShell suggestions so the report can show them.
+// latestIssues becomes the compact Local Accessibility Report suggestions after a local scan.
 let latestIssues = [];
 
-let enforcerHasBeenStopped = false;
+let latestReport = null;
+let testScanRunning = false;
 let monitorIntervalId = null;
 let isScanning = false;
 let lastDetectedApp = null;
-
-function updateMode() {
-  document.body.classList.remove("mode-voyager", "mode-guardian", "mode-beacon");
-  document.body.classList.add(`mode-${selectedMode}`);
-
-  // Overlay colors are CSS variables changed by the body mode class above.
-}
-
-function updateContent() {
-  heroTitle.innerHTML = clarifyContent ? clarifiedTitle : originalTitle;
-  heroDescription.textContent = clarifyContent ? clarifiedDescription : originalDescription;
-}
-
-function updateEnforcer() {
-  enforcerButton.textContent =
-    enforcerEnabled ? "Stop Enforcement" : "Simulate Aura Enforcer";
-
-  scannerApp.textContent = currentApp;
-  scannerFixes.textContent = enforcerEnabled ? fixesApplied : 0;
-  scannerProfile.textContent = activeProfile.profileName;
-  scannerPrivacy.textContent = latestReport?.privacyMode || "local-first";
-}
-
-function updateOverlay() {
-  document.body.classList.toggle("show-overlay", clarifyContent || enforcerEnabled);
-  document.body.classList.toggle("enforcer-active", enforcerEnabled);
-}
-
-function getOverlayPayload() {
-  return {
-    mode: selectedMode,
-    profileName: activeProfile.profileName,
-    filterClass: activeProfile.filterClass,
-    activeApp: currentApp
-  };
-}
-
-function sendExternalOverlayUpdate() {
-  if (!enforcerEnabled || !window.auraAPI || !window.auraAPI.updateOverlay) {
-    return;
-  }
-
-  window.auraAPI.updateOverlay(getOverlayPayload());
-}
+let overlayScanStatus = "Waiting";
+let scannerModeOverride = null;
+let lastScanTime = "Never";
+let lastScanStatus = "Waiting";
+let lastScanType = "Waiting";
+let lastScanError = "None";
+let latestRawScanResult = null;
+let latestEnforcementAreas = [];
 
 function normalizeAppName(activeApp) {
   const appName = activeApp || "";
@@ -241,17 +234,8 @@ function normalizeAppName(activeApp) {
 function getProfileForApp(activeApp) {
   const normalizedApp = normalizeAppName(activeApp);
 
-  // activeApp selects the profile by exact local app name after a case-insensitive match.
+  // activeApp selects a local profile by app name. No screen content is inspected.
   return accessibilityProfiles[normalizedApp] || defaultProfile;
-}
-
-function applyProfileFilter(profile) {
-  document.body.classList.remove(...profileFilterClasses);
-
-  // This is the first local adaptive filter layer. It changes AURA's guidance/filter
-  // state based on the active application, but it does not draw on top of external apps yet.
-  // filterClass changes the UI feeling locally without redesigning the page.
-  document.body.classList.add(profile.filterClass);
 }
 
 function sanitizeWindowTitle(title) {
@@ -264,95 +248,468 @@ function sanitizeWindowTitle(title) {
     return "Unknown window";
   }
 
-  if (cleanedTitle.length > 96) {
-    return `${cleanedTitle.slice(0, 96).trim()}...`;
+  if (cleanedTitle.length > 84) {
+    return `${cleanedTitle.slice(0, 84).trim()}...`;
   }
 
   return cleanedTitle;
 }
 
-function updateLocalReport(result, profile) {
-  latestReport = result;
-  latestIssues = Array.isArray(profile.suggestions) ? profile.suggestions : [];
+const modeLabels = {
+  voyager: "The Voyager — Color Blind",
+  guardian: "The Guardian — Eye Strain",
+  beacon: "The Beacon — Low Vision"
+};
 
-  reportApp.textContent = result.activeApp || "Unavailable";
-  reportProfile.textContent = profile.profileName;
-  reportScreenshot.textContent = String(result.screenshotSentToAI === true);
-  reportWindow.textContent = sanitizeWindowTitle(result.windowTitle);
+const colorVisionLabels = {
+  "protanopia": "Protanopia support",
+  "deuteranopia": "Deuteranopia support",
+  "tritanopia": "Tritanopia support",
+  "achromatopsia": "Achromatopsia support",
+  "contrast-boost": "General contrast support"
+};
+
+const eyeStrainLabels = {
+  "warm-comfort": "Warm Comfort",
+  "dim-focus": "Dim Focus",
+  "reduced-motion": "Reduced Motion",
+  "soft-contrast": "Soft Contrast",
+  "night-session": "Night Session"
+};
+
+const lowVisionLabels = {
+  "high-contrast": "High Contrast",
+  "large-focus": "Large Focus",
+  "reading-support": "Reading Support",
+  "edge-guidance": "Edge Guidance",
+  "maximum-visibility": "Maximum Visibility"
+};
+
+const preferenceKeys = {
+  selectedMode: "aura.selectedMode",
+  selectedColorVisionProfile: "aura.selectedColorVisionProfile",
+  selectedEyeStrainProfile: "aura.selectedEyeStrainProfile",
+  selectedLowVisionProfile: "aura.selectedLowVisionProfile",
+  filterIntensity: "aura.filterIntensity"
+};
+
+function getSelectedProfileName() {
+  if (selectedMode === "guardian") {
+    return eyeStrainLabels[selectedEyeStrainProfile];
+  }
+
+  if (selectedMode === "beacon") {
+    return lowVisionLabels[selectedLowVisionProfile];
+  }
+
+  return colorVisionLabels[selectedColorVisionProfile];
+}
+
+function getStoredValue(key, fallback, allowedValues = null) {
+  const value = localStorage.getItem(key);
+
+  if (!value) {
+    return fallback;
+  }
+
+  if (allowedValues && !allowedValues.includes(value)) {
+    return fallback;
+  }
+
+  return value;
+}
+
+function clampIntensity(value) {
+  const number = Number(value);
+
+  if (Number.isNaN(number)) {
+    return 60;
+  }
+
+  return Math.min(100, Math.max(0, Math.round(number)));
+}
+
+function loadPreferences() {
+  selectedMode = getStoredValue(preferenceKeys.selectedMode, selectedMode, ["voyager", "guardian", "beacon"]);
+  selectedColorVisionProfile = getStoredValue(preferenceKeys.selectedColorVisionProfile, selectedColorVisionProfile, Object.keys(colorVisionLabels));
+  selectedEyeStrainProfile = getStoredValue(preferenceKeys.selectedEyeStrainProfile, selectedEyeStrainProfile, Object.keys(eyeStrainLabels));
+  selectedLowVisionProfile = getStoredValue(preferenceKeys.selectedLowVisionProfile, selectedLowVisionProfile, Object.keys(lowVisionLabels));
+  filterIntensity = clampIntensity(localStorage.getItem(preferenceKeys.filterIntensity) || filterIntensity);
+}
+
+function savePreferences() {
+  localStorage.setItem(preferenceKeys.selectedMode, selectedMode);
+  localStorage.setItem(preferenceKeys.selectedColorVisionProfile, selectedColorVisionProfile);
+  localStorage.setItem(preferenceKeys.selectedEyeStrainProfile, selectedEyeStrainProfile);
+  localStorage.setItem(preferenceKeys.selectedLowVisionProfile, selectedLowVisionProfile);
+  localStorage.setItem(preferenceKeys.filterIntensity, String(filterIntensity));
+  preferencesStatus.textContent = "Preferences saved locally";
+}
+
+function getOverlayPayload() {
+  // Current AURA adapts dynamically based on the active application, selected
+  // accessibility profile, and local Windows UI Automation rectangles when available.
+  return {
+    mode: selectedMode,
+    profileName: getSelectedProfileName(),
+    filterClass: activeProfile.filterClass,
+    activeApp: currentApp,
+    colorVisionProfile: selectedColorVisionProfile,
+    selectedColorVisionProfile,
+    eyeStrainProfile: selectedEyeStrainProfile,
+    selectedEyeStrainProfile,
+    lowVisionProfile: selectedLowVisionProfile,
+    selectedLowVisionProfile,
+    filterIntensity,
+    screenEnforcementActive,
+    scanStatus: overlayScanStatus,
+    enforcementAreas: latestEnforcementAreas
+  };
+}
+
+function getCurrentScanTime() {
+  return new Date().toLocaleString();
+}
+
+function getIssueCountFromResult(result) {
+  return Array.isArray(result?.detectedIssues) ? result.detectedIssues.length : 0;
+}
+
+function updateDiagnosticsState({ type, status, result = null, error = "" }) {
+  lastScanTime = getCurrentScanTime();
+  lastScanType = type || lastScanType;
+  lastScanStatus = status || lastScanStatus;
+  lastScanError = error || result?.error || "None";
+
+  if (result) {
+    latestRawScanResult = result;
+  }
+
+  updateDiagnosticsPanel(result);
+}
+
+function updateDiagnosticsPanel(result = latestRawScanResult) {
+  const activeApp = result?.activeApp || currentApp || "Waiting";
+  const windowTitle = sanitizeWindowTitle(result?.windowTitle || latestReport?.windowTitle || "Unknown window");
+
+  diagScanTime.textContent = lastScanTime;
+  diagScanType.textContent = lastScanType;
+  diagScanStatus.textContent = lastScanStatus;
+  diagActiveApp.textContent = activeApp;
+  diagWindowTitle.textContent = windowTitle;
+  diagIssueCount.textContent = getIssueCountFromResult(result);
+  diagLastError.textContent = lastScanError || "None";
+  diagRawResult.textContent = result
+    ? JSON.stringify(result, null, 2)
+    : "No scan result yet.";
+}
+
+function sendExternalOverlayUpdate(force = false) {
+  if ((!force && !screenEnforcementActive) || !window.auraAPI || !window.auraAPI.updateOverlay) {
+    return;
+  }
+
+  const payload = getOverlayPayload();
+  console.log("Sending overlay scan status:", payload);
+  window.auraAPI.updateOverlay(payload);
+}
+
+function getSafeEnforcementAreas(areas) {
+  if (!Array.isArray(areas)) {
+    return [];
+  }
+
+  return areas
+    .map((area) => ({
+      x: Number(area.x),
+      y: Number(area.y),
+      width: Number(area.width),
+      height: Number(area.height),
+      reason: String(area.reason || "Accessibility enforcement area"),
+      severity: String(area.severity || "medium")
+    }))
+    .filter((area) => (
+      Number.isFinite(area.x) &&
+      Number.isFinite(area.y) &&
+      Number.isFinite(area.width) &&
+      Number.isFinite(area.height) &&
+      area.width > 0 &&
+      area.height > 0
+    ))
+    .slice(0, 24);
+}
+
+function applyPreviewClasses() {
+  document.documentElement.style.setProperty("--filter-intensity", String(filterIntensity / 100));
+  document.body.classList.remove(...modeClasses);
+  document.body.classList.add(`mode-${selectedMode}`);
+  document.body.classList.remove(...colorVisionClasses);
+  document.body.classList.remove(...eyeStrainClasses);
+  document.body.classList.remove(...lowVisionClasses);
+
+  if (selectedMode === "voyager") {
+    document.body.classList.add(`color-${selectedColorVisionProfile}`);
+  } else if (selectedMode === "guardian") {
+    document.body.classList.add(`eye-${selectedEyeStrainProfile}`);
+  } else if (selectedMode === "beacon") {
+    document.body.classList.add(`low-${selectedLowVisionProfile}`);
+  }
+
+  document.body.classList.toggle("preview-active", previewActive);
+  document.body.classList.toggle("screen-enforcement-active", screenEnforcementActive);
+}
+
+function applyProfileFilter(profile) {
+  document.body.classList.remove(...profileFilterClasses);
+
+  if (!previewActive && !screenEnforcementActive) {
+    return;
+  }
+
+  // Current AURA adapts dynamically based on the active application and selected
+  // accessibility profile. External rectangles are only drawn when Windows UI
+  // Automation returns real bounding boxes.
+  document.body.classList.add(profile.filterClass);
+}
+
+function updateModeCards() {
+  modeCards.forEach((card) => {
+    card.classList.toggle("is-active", card.dataset.modeCard === selectedMode);
+  });
+
+  colorProfileCards.forEach((card) => {
+    card.classList.toggle("is-active", card.dataset.colorProfile === selectedColorVisionProfile);
+  });
+
+  eyeProfileCards.forEach((card) => {
+    card.classList.toggle("is-active", card.dataset.eyeProfile === selectedEyeStrainProfile);
+  });
+
+  lowProfileCards.forEach((card) => {
+    card.classList.toggle("is-active", card.dataset.lowProfile === selectedLowVisionProfile);
+  });
+}
+
+function updateStatusPanel() {
+  selectedModeStatus.textContent = modeLabels[selectedMode];
+  selectedProfileStatus.textContent = getSelectedProfileName();
+  screenStatus.textContent = screenEnforcementActive ? "ON" : "OFF";
+  scannerApp.textContent = currentApp;
+  scannerPrivacy.textContent = latestReport?.privacyMode || "local-first";
+  screenshotStatus.textContent = "not captured";
+  enforcementAreaCount.textContent = latestEnforcementAreas.length;
+  scannerFixes.textContent = latestIssues.length;
+
+  if (scannerModeOverride) {
+    scannerMode.textContent = scannerModeOverride;
+  } else if (!screenEnforcementActive && !isScanning) {
+    scannerMode.textContent = "IDLE";
+  }
+
+  previewButton.textContent = previewActive ? "Stop Preview" : "Preview in AURA";
+  filterIntensityInput.value = String(filterIntensity);
+  filterIntensityValue.textContent = `${filterIntensity}%`;
+  testScanButton.textContent = testScanRunning ? "Testing..." : "Test Scan";
+  testScanButton.disabled = testScanRunning;
+  testScanButton.classList.toggle("is-busy", testScanRunning);
+  screenEnforcementButton.textContent = screenEnforcementActive
+    ? "Stop Screen Enforcement"
+    : "Start Screen Enforcement";
+}
+
+function renderReportIssues(issues) {
   reportIssues.innerHTML = "";
 
-  latestIssues.forEach((issue) => {
+  issues.slice(0, 6).forEach((issue) => {
     const item = document.createElement("li");
     item.textContent = issue;
     reportIssues.appendChild(item);
   });
 }
 
-function updateScannerPanelFromProfile(result, profile) {
-  currentApp = result.activeApp || "Unknown.exe";
-  fixesApplied = Array.isArray(profile.suggestions) ? profile.suggestions.length : 0;
+function updateLocalReport(result, profile) {
+  latestReport = result;
+  latestIssues = Array.isArray(profile.suggestions) ? profile.suggestions : [];
 
-  // Fixes Applied is the number of local suggestions in the matched accessibility profile.
-  scannerApp.textContent = currentApp;
-  scannerFixes.textContent = fixesApplied;
-  scannerProfile.textContent = profile.profileName;
-  scannerPrivacy.textContent = result.privacyMode || "local-first";
+  reportWindow.textContent = sanitizeWindowTitle(result.windowTitle);
+  renderReportIssues(latestIssues);
 }
 
-async function runLocalScan() {
+function updateScannerPanelFromProfile(result, profile) {
+  currentApp = result.activeApp || "Unknown.exe";
+  activeProfile = profile;
+  latestIssues = Array.isArray(profile.suggestions) ? profile.suggestions : [];
+  latestReport = result;
+}
+
+async function runMonitoringCycle() {
   if (isScanning) {
     return;
   }
 
   isScanning = true;
+  scannerModeOverride = null;
   scannerMode.textContent = "SCANNING";
+  overlayScanStatus = "Scanning...";
+  latestEnforcementAreas = [];
+  updateDiagnosticsState({
+    type: "Active app + UI Automation scan",
+    status: "Scanning",
+    result: latestRawScanResult
+  });
+  sendExternalOverlayUpdate();
+
+  try {
+    if (!window.auraAPI || !window.auraAPI.scanActiveWindow || !window.auraAPI.scanUIAutomation) {
+      throw new Error("Electron preload API unavailable. Start the app with Electron.");
+    }
+
+    // This monitoring cycle uses local Windows metadata only: active-window.ps1
+    // for the foreground app and Windows UI Automation for accessible element
+    // bounds. It does not capture, save, upload, or send screenshots to AI.
+    const activeWindowResult = await window.auraAPI.scanActiveWindow();
+    console.log("AURA active-window scan result:", activeWindowResult);
+    const uiAutomationResult = await window.auraAPI.scanUIAutomation();
+    console.log("AURA UI Automation scan result:", uiAutomationResult);
+
+    if (!screenEnforcementActive) {
+      scannerMode.textContent = "IDLE";
+      return;
+    }
+
+    const activeApp = activeWindowResult.activeApp || uiAutomationResult.activeApp || "Unknown.exe";
+    const appChanged = activeApp !== lastDetectedApp;
+    lastDetectedApp = activeApp;
+    const profile = getProfileForApp(activeApp);
+    const areas = getSafeEnforcementAreas(uiAutomationResult.enforcementAreas);
+    const uiAutomationLimited = Boolean(uiAutomationResult.error);
+    const activeScanLimited = Boolean(activeWindowResult.error);
+    const mergedIssues = Array.isArray(uiAutomationResult.detectedIssues)
+      ? uiAutomationResult.detectedIssues
+      : [];
+
+    let scanStatus = "Done";
+
+    if (uiAutomationLimited || activeScanLimited) {
+      scanStatus = "Scan limited";
+    } else if (areas.length > 0) {
+      scanStatus = "Areas detected";
+    } else {
+      scanStatus = "No areas detected";
+    }
+
+    const mergedResult = {
+      ...activeWindowResult,
+      ...uiAutomationResult,
+      activeApp,
+      windowTitle: uiAutomationLimited
+        ? activeWindowResult.windowTitle || uiAutomationResult.windowTitle || "Unknown window"
+        : uiAutomationResult.windowTitle || activeWindowResult.windowTitle || "Unknown window",
+      privacyMode: "local-first",
+      screenshotSentToAI: false,
+      uiAutomationUsed: true,
+      detectedIssues: uiAutomationLimited
+        ? ["UI areas unavailable for this app.", ...mergedIssues]
+        : mergedIssues,
+      enforcementAreas: areas,
+      activeWindowScan: activeWindowResult,
+      uiAutomationScan: uiAutomationResult
+    };
+
+    updateScannerPanelFromProfile(mergedResult, profile);
+    latestIssues = mergedResult.detectedIssues.length > 0
+      ? mergedResult.detectedIssues
+      : profile.suggestions;
+    latestEnforcementAreas = areas;
+    overlayScanStatus = scanStatus;
+    applyProfileFilter(profile);
+    latestReport = mergedResult;
+    reportWindow.textContent = sanitizeWindowTitle(mergedResult.windowTitle);
+    renderReportIssues(latestIssues);
+    updateDiagnosticsState({
+      type: "Active app + UI Automation scan",
+      status: scanStatus,
+      result: mergedResult,
+      error: uiAutomationResult.error || activeWindowResult.error || ""
+    });
+    sendExternalOverlayUpdate();
+
+    if (appChanged) {
+      console.log(`AURA active app changed: ${activeApp}`);
+    }
+
+    scannerMode.textContent = uiAutomationLimited || activeScanLimited ? "SCAN LIMITED" : "ENFORCING";
+  } catch (error) {
+    console.error("AURA monitoring cycle failed:", error);
+    scannerMode.textContent = "SCAN LIMITED";
+    overlayScanStatus = "Scan limited";
+    latestEnforcementAreas = [];
+    latestIssues = ["UI areas unavailable for this app."];
+    renderReportIssues(latestIssues);
+    updateDiagnosticsState({
+      type: "Active app + UI Automation scan",
+      status: "Scan limited",
+      error: error.message
+    });
+    sendExternalOverlayUpdate();
+  } finally {
+    isScanning = false;
+    render();
+  }
+}
+
+async function runTestScan() {
+  if (testScanRunning) {
+    return;
+  }
+
+  testScanRunning = true;
+  updateDiagnosticsState({
+    type: "Active app scan",
+    status: "Scanning",
+    result: latestRawScanResult
+  });
+  render();
 
   try {
     if (!window.auraAPI || !window.auraAPI.scanActiveWindow) {
       throw new Error("Electron preload API unavailable. Start the app with Electron.");
     }
 
-    // This IPC call asks Electron's main process to run active-window.ps1 locally.
-    // The script detects the active app and suggestions without screenshots or AI upload.
+    // Test Scan runs active-window.ps1 once for diagnostics only.
+    // It does not start the overlay, change enforcement mode, or upload anything.
     const result = await window.auraAPI.scanActiveWindow();
-    console.log("AURA scan result:", result);
-
-    if (!enforcerEnabled) {
-      return;
-    }
-
-    const activeApp = result.activeApp || "Unknown.exe";
-    const appChanged = activeApp !== lastDetectedApp;
-    lastDetectedApp = activeApp;
-    const profile = getProfileForApp(activeApp);
-
-    currentApp = activeApp;
-    latestIssues = profile.suggestions || [];
-    activeProfile = profile;
-
-    updateScannerPanelFromProfile(result, profile);
-
-    if (appChanged || !latestReport) {
-      applyProfileFilter(profile);
-      updateLocalReport(result, profile);
-      sendExternalOverlayUpdate();
-      console.log(`AURA active app changed: ${activeApp}`);
-    }
-
-    scannerMode.textContent = "ENFORCING";
+    console.log("AURA test scan result:", result);
+    updateDiagnosticsState({
+      type: "Active app scan",
+      status: result.error ? "Error" : "Done",
+      result,
+      error: result.error || ""
+    });
   } catch (error) {
-    console.error("AURA local scan failed:", error);
-    scannerMode.textContent = "ERROR";
+    console.error("AURA test scan failed:", error);
+    const errorResult = {
+      activeApp: "Unavailable",
+      windowTitle: "Unavailable",
+      privacyMode: "local-first",
+      screenshotSentToAI: false,
+      detectedIssues: [
+        "AURA test scan failed locally."
+      ],
+      aiSafeSummary: "AURA test scan failed locally. No screenshots were captured, saved, or sent to AI.",
+      error: error.message
+    };
+    updateDiagnosticsState({
+      type: "Active app scan",
+      status: "Error",
+      result: errorResult,
+      error: error.message
+    });
   } finally {
-    isScanning = false;
+    testScanRunning = false;
+    render();
   }
 }
-
-// Future external overlay plan:
-// - Create a transparent always-on-top Electron overlay window.
-// - Make it click-through so it guides without blocking the active app.
-// - Match the active local profile and draw guidance/filter on top of the active app.
-// - No screenshots are required for app-profile filters.
 
 function startMonitoring() {
   if (monitorIntervalId) {
@@ -360,16 +717,17 @@ function startMonitoring() {
   }
 
   console.log("AURA monitoring started");
+
   if (window.auraAPI && window.auraAPI.showOverlay) {
     window.auraAPI.showOverlay();
     sendExternalOverlayUpdate();
   }
 
-  runLocalScan();
+  runMonitoringCycle();
 
   monitorIntervalId = setInterval(() => {
-    if (enforcerEnabled) {
-      runLocalScan();
+    if (screenEnforcementActive) {
+      runMonitoringCycle();
     }
   }, 3000);
 }
@@ -381,45 +739,136 @@ function stopMonitoring() {
   }
 
   console.log("AURA monitoring stopped");
+
   if (window.auraAPI && window.auraAPI.hideOverlay) {
     window.auraAPI.hideOverlay();
   }
 
+  screenEnforcementActive = false;
+  isScanning = false;
+  overlayScanStatus = "Waiting";
+  latestEnforcementAreas = [];
+  scannerModeOverride = null;
   scannerMode.textContent = "IDLE";
-  scannerFixes.textContent = "0";
+  lastDetectedApp = null;
 }
 
-function render() {
-  updateMode();
-  updateContent();
-  updateEnforcer();
-  updateOverlay();
-}
-
-modeSelect.addEventListener("change", (event) => {
-  selectedMode = event.target.value;
-  render();
-  sendExternalOverlayUpdate();
-});
-
-clarifyToggle.addEventListener("change", (event) => {
-  clarifyContent = event.target.checked;
-  render();
-});
-
-enforcerButton.addEventListener("click", () => {
-  enforcerEnabled = !enforcerEnabled;
-
-  if (!enforcerEnabled) {
-    enforcerHasBeenStopped = true;
-    document.body.classList.remove(...profileFilterClasses);
-    stopMonitoring();
+function emergencyStop() {
+  if (!screenEnforcementActive && !monitorIntervalId) {
     render();
     return;
   }
 
+  stopMonitoring();
+  applyProfileFilter(activeProfile);
+  render();
+}
+
+function togglePreview() {
+  previewActive = !previewActive;
+  applyProfileFilter(activeProfile);
+  render();
+}
+
+function toggleScreenEnforcement() {
+  screenEnforcementActive = !screenEnforcementActive;
+
+  if (!screenEnforcementActive) {
+    stopMonitoring();
+    applyProfileFilter(activeProfile);
+    render();
+    return;
+  }
+
+  applyProfileFilter(activeProfile);
   render();
   startMonitoring();
+}
+
+function selectMode(mode) {
+  selectedMode = mode;
+  savePreferences();
+  render();
+  sendExternalOverlayUpdate();
+}
+
+function selectColorVisionProfile(profile) {
+  selectedColorVisionProfile = profile;
+  savePreferences();
+  render();
+  sendExternalOverlayUpdate();
+}
+
+function selectEyeStrainProfile(profile) {
+  selectedEyeStrainProfile = profile;
+  savePreferences();
+  render();
+  sendExternalOverlayUpdate();
+}
+
+function selectLowVisionProfile(profile) {
+  selectedLowVisionProfile = profile;
+  savePreferences();
+  render();
+  sendExternalOverlayUpdate();
+}
+
+function updateFilterIntensity(value) {
+  filterIntensity = clampIntensity(value);
+  savePreferences();
+  render();
+  sendExternalOverlayUpdate();
+}
+
+function render() {
+  applyPreviewClasses();
+  updateModeCards();
+  updateStatusPanel();
+}
+
+modeCards.forEach((card) => {
+  card.addEventListener("click", () => {
+    selectMode(card.dataset.modeCard);
+  });
 });
 
+colorProfileCards.forEach((card) => {
+  card.addEventListener("click", () => {
+    selectColorVisionProfile(card.dataset.colorProfile);
+  });
+});
+
+eyeProfileCards.forEach((card) => {
+  card.addEventListener("click", () => {
+    selectEyeStrainProfile(card.dataset.eyeProfile);
+  });
+});
+
+lowProfileCards.forEach((card) => {
+  card.addEventListener("click", () => {
+    selectLowVisionProfile(card.dataset.lowProfile);
+  });
+});
+
+previewButton.addEventListener("click", togglePreview);
+testScanButton.addEventListener("click", runTestScan);
+screenEnforcementButton.addEventListener("click", toggleScreenEnforcement);
+emergencyStopButton.addEventListener("click", emergencyStop);
+filterIntensityInput.addEventListener("input", (event) => {
+  updateFilterIntensity(event.target.value);
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.ctrlKey && event.altKey && event.key.toLowerCase() === "a") {
+    event.preventDefault();
+    emergencyStop();
+  }
+});
+
+if (window.auraAPI && window.auraAPI.onEmergencyStop) {
+  window.auraAPI.onEmergencyStop(emergencyStop);
+}
+
+loadPreferences();
+updateDiagnosticsPanel();
 render();

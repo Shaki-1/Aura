@@ -7,16 +7,16 @@
     "start": "electron .",
     "dist": "electron-builder --win portable"
   },
-  "dependencies": {
-    "get-windows": "^9.3.0"
-  },
   "devDependencies": {
     "electron": "^42.3.1",
-    "electron-builder": "^26.0.12"
+    "electron-builder": "^26.8.1"
   },
   "build": {
     "appId": "com.aura.accessibility",
     "productName": "AURA",
+    "directories": {
+      "output": "release"
+    },
     "files": [
       "index.html",
       "style.css",
@@ -27,10 +27,18 @@
       "overlay.css",
       "overlay.js",
       "active-window.ps1",
+      "ui-automation-scan.ps1",
+      "README.md",
       "package.json"
     ],
+    "extraResources": [
+      "active-window.ps1",
+      "ui-automation-scan.ps1"
+    ],
     "win": {
-      "target": "portable"
+      "target": [
+        "portable"
+      ]
     }
   }
 }
