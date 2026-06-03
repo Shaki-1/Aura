@@ -8,19 +8,28 @@
 </head>
 <body>
   <div class="page-shell">
-    <main class="app-layout">
+    <main class="app-layout" id="mainView">
       <section class="identity-column" aria-labelledby="heroTitle">
-        <a class="brand" href="#" aria-label="AURA home">AURA</a>
+        <div class="brand-row">
+          <a class="brand" href="#" aria-label="AURA home">AURA</a>
+          <div class="brand-actions">
+            <button class="about-button" id="aboutButton" type="button">About</button>
+            <!-- Future download URL:
+                 Replace this disabled button with an anchor pointing to GitHub Releases.
+                 Example: https://github.com/<owner>/<repo>/releases/latest -->
+            <button class="download-button" type="button" disabled aria-disabled="true">Coming Soon</button>
+          </div>
+        </div>
 
         <div class="hero-copy">
-          <span class="badge">Aura Enforcer | Alpha 0.1</span>
+          <span class="badge">AURA Accessibility Assistant</span>
 
           <h1 class="hero-title" id="heroTitle">
             The Guardian of <span>Accessibility.</span>
           </h1>
 
           <p class="hero-description">
-            Intelligence that lives between your windows. AURA adapts visual comfort, contrast, and focus support locally so desktop apps become easier to use.
+            Private by design. AURA adapts visual comfort, contrast, and focus locally on your device.
           </p>
 
         </div>
@@ -28,209 +37,226 @@
 
       <section class="control-column" aria-label="AURA desktop accessibility controls">
         <section class="glass-panel enforcement-panel" aria-labelledby="enforcementTitle">
-          <h2 id="enforcementTitle">Choose Enforcement</h2>
-          <p>Select how AURA should adapt the interface for your accessibility needs.</p>
+          <div id="modeChoiceContent">
+            <h2 id="enforcementTitle">Choose enforcement</h2>
+            <p>Select how AURA should adapt the interface for your accessibility needs.</p>
 
-          <div class="mode-card-grid" role="group" aria-label="Choose enforcement mode">
-            <button class="mode-card is-active" type="button" data-mode-card="voyager">
-              <span>The Voyager</span>
-              <strong>Color Blind</strong>
-              <small>Adapts contrast and color emphasis to make information easier to distinguish without relying only on color.</small>
-            </button>
+            <div class="mode-card-grid" role="group" aria-label="Choose enforcement mode">
+              <button class="mode-card" type="button" data-mode-card="voyager">
+                <span>The Voyager</span>
+                <strong>Color blind</strong>
+                <small>Adapts contrast and color emphasis to make information easier to distinguish without relying only on color.</small>
+              </button>
 
-            <button class="mode-card" type="button" data-mode-card="guardian">
-              <span>The Guardian</span>
-              <strong>Eye Strain</strong>
-              <small>Softens brightness, glare, and harsh contrast for more comfortable long sessions.</small>
-            </button>
+              <button class="mode-card" type="button" data-mode-card="guardian">
+                <span>The Guardian</span>
+                <strong>Eye strain</strong>
+                <small>Softens brightness, glare, and harsh contrast for more comfortable long sessions.</small>
+              </button>
 
-            <button class="mode-card" type="button" data-mode-card="beacon">
-              <span>The Beacon</span>
-              <strong>Low Vision</strong>
-              <small>Increases visibility with stronger contrast, clearer focus areas, and high-visibility guidance.</small>
-            </button>
+              <button class="mode-card" type="button" data-mode-card="beacon">
+                <span>The Beacon</span>
+                <strong>Low vision</strong>
+                <small>Increases visibility with stronger contrast, clearer focus areas, and high-visibility guidance.</small>
+              </button>
+            </div>
+
+          </div>
+
+          <div class="step-summary" id="modeSummaryPanel" hidden>
+            <div class="summary-stack">
+              <p><span aria-hidden="true">✓</span> <strong id="modeSummaryText">The Voyager — Color blind</strong></p>
+              <aside class="mode-fit-card" aria-live="polite">
+                <strong>Best for:</strong>
+                <ul id="modeFitList">
+                  <li>Color blindness</li>
+                  <li>Color differentiation</li>
+                  <li>Contrast support</li>
+                </ul>
+              </aside>
+            </div>
+            <div class="summary-actions">
+              <button class="summary-change" id="viewModeButton" type="button">View details</button>
+              <button class="summary-change" id="changeModeButton" type="button">Change</button>
+            </div>
           </div>
         </section>
 
         <section class="glass-panel color-vision-panel" id="colorVisionPanel" aria-labelledby="colorVisionTitle">
-          <h2 id="colorVisionTitle">Color Vision Profile</h2>
+          <h2 id="colorVisionTitle">Color vision profile</h2>
           <p>Choose how AURA should adapt color and contrast. This does not diagnose vision; it selects a support profile for better visibility.</p>
 
           <div class="color-profile-grid" role="group" aria-label="Choose color vision support profile">
             <button class="color-profile-card" type="button" data-color-profile="protanopia">
-              <strong>Protanopia support</strong>
-              <span>Helps when red tones are difficult to perceive by increasing blue/yellow separation and reducing red-only cues.</span>
+              <strong>Red-green support (Protanopia)</strong>
+              <span>Helps when red tones are difficult to perceive.</span>
             </button>
 
             <button class="color-profile-card" type="button" data-color-profile="deuteranopia">
-              <strong>Deuteranopia support</strong>
-              <span>Helps when green tones are difficult to perceive by increasing blue/orange separation and reducing green-only cues.</span>
+              <strong>Red-green support (Deuteranopia)</strong>
+              <span>Helps when green tones are difficult to perceive.</span>
             </button>
 
             <button class="color-profile-card" type="button" data-color-profile="tritanopia">
-              <strong>Tritanopia support</strong>
-              <span>Helps when blue/yellow tones are difficult to distinguish by increasing magenta/cyan separation.</span>
+              <strong>Blue-yellow support (Tritanopia)</strong>
+              <span>Helps when blue and yellow tones are difficult to distinguish.</span>
             </button>
 
             <button class="color-profile-card" type="button" data-color-profile="achromatopsia">
-              <strong>Achromatopsia support</strong>
-              <span>Helps when color is very limited by relying more on brightness contrast, borders, labels, and patterns.</span>
+              <strong>Monochrome support (Achromatopsia)</strong>
+              <span>Uses brightness, borders, labels, and patterns when color is limited.</span>
             </button>
 
             <button class="color-profile-card is-active" type="button" data-color-profile="contrast-boost">
               <strong>General contrast support</strong>
-              <span>Improves overall contrast and focus visibility when you are not sure which profile to choose.</span>
+              <span>Improves clarity when you are not sure which profile to choose.</span>
             </button>
           </div>
         </section>
 
         <section class="glass-panel profile-panel eye-strain-panel" aria-labelledby="eyeStrainTitle">
-          <h2 id="eyeStrainTitle">Eye Comfort Profile</h2>
+          <h2 id="eyeStrainTitle">Eye comfort profile</h2>
           <p>Choose how AURA should reduce visual fatigue during long computer sessions.</p>
 
           <div class="profile-grid" role="group" aria-label="Choose eye strain profile">
             <button class="profile-card is-active" type="button" data-eye-profile="warm-comfort">
-              <strong>Warm Comfort</strong>
+              <strong>Warm comfort</strong>
               <span>Softens cold blue tones and adds a warmer screen tint.</span>
             </button>
 
             <button class="profile-card" type="button" data-eye-profile="dim-focus">
-              <strong>Dim Focus</strong>
+              <strong>Dim focus</strong>
               <span>Reduces brightness intensity and glare.</span>
             </button>
 
             <button class="profile-card" type="button" data-eye-profile="reduced-motion">
-              <strong>Reduced Motion</strong>
+              <strong>Reduced motion</strong>
               <span>Minimizes visual movement and animated feeling inside AURA and overlay.</span>
             </button>
 
             <button class="profile-card" type="button" data-eye-profile="soft-contrast">
-              <strong>Soft Contrast</strong>
+              <strong>Soft contrast</strong>
               <span>Lowers harsh contrast while keeping text readable.</span>
             </button>
 
             <button class="profile-card" type="button" data-eye-profile="night-session">
-              <strong>Night Session</strong>
+              <strong>Night session</strong>
               <span>Combines warm tint, dimming, and reduced glare for evening use.</span>
             </button>
           </div>
         </section>
 
         <section class="glass-panel profile-panel low-vision-panel" aria-labelledby="lowVisionTitle">
-          <h2 id="lowVisionTitle">Low Vision Profile</h2>
+          <h2 id="lowVisionTitle">Low vision profile</h2>
           <p>Choose how AURA should increase visibility, focus, and readability.</p>
 
           <div class="profile-grid" role="group" aria-label="Choose low vision profile">
             <button class="profile-card is-active" type="button" data-low-profile="high-contrast">
-              <strong>High Contrast</strong>
+              <strong>High contrast</strong>
               <span>Strengthens contrast between text, panels, and focus areas.</span>
             </button>
 
             <button class="profile-card" type="button" data-low-profile="large-focus">
-              <strong>Large Focus</strong>
+              <strong>Large focus</strong>
               <span>Uses thicker focus outlines and stronger visual guidance.</span>
             </button>
 
             <button class="profile-card" type="button" data-low-profile="reading-support">
-              <strong>Reading Support</strong>
+              <strong>Reading support</strong>
               <span>Improves readability with clearer spacing and stronger text emphasis.</span>
             </button>
 
             <button class="profile-card" type="button" data-low-profile="edge-guidance">
-              <strong>Edge Guidance</strong>
+              <strong>Edge guidance</strong>
               <span>Adds a high-visibility frame to help orientation on screen.</span>
             </button>
 
             <button class="profile-card" type="button" data-low-profile="maximum-visibility">
-              <strong>Maximum Visibility</strong>
+              <strong>Maximum visibility</strong>
               <span>Combines strong contrast, large focus, and bright guidance.</span>
             </button>
           </div>
         </section>
 
-        <section class="glass-panel action-panel" aria-labelledby="actionTitle">
-          <div>
-            <p class="panel-kicker">AURA Actions</p>
-            <h2 id="actionTitle">Apply Support</h2>
+        <section class="glass-panel step-summary profile-summary-panel" id="profileSummaryPanel" hidden>
+          <p><span aria-hidden="true">✓</span> <strong id="profileSummaryText">General contrast support</strong></p>
+          <div class="summary-actions">
+            <button class="summary-change" id="viewProfileButton" type="button">View details</button>
+            <button class="summary-change" id="changeProfileButton" type="button">Change</button>
           </div>
+        </section>
 
+        <section class="glass-panel action-panel" id="actionPanel" aria-label="Apply accessibility support" hidden>
           <div class="action-buttons">
-            <button class="secondary-action" id="previewButton" type="button">Preview in AURA</button>
-            <button class="primary-action" id="screenEnforcementButton" type="button">Start Screen Enforcement</button>
-            <div class="emergency-control">
-              <button class="danger-action" id="emergencyStopButton" type="button">Stop all enforcement</button>
+            <button class="secondary-action" id="previewButton" type="button" hidden>Stop preview</button>
+            <button class="primary-action" id="screenEnforcementButton" type="button">Activate accessibility support</button>
+            <div class="stop-all-control" id="stopAllControl" hidden>
               <span>Shortcut: Ctrl + Alt + A</span>
             </div>
           </div>
 
-          <div class="filter-control" aria-label="Filter strength control">
-            <label for="filterIntensityInput">Filter Strength: <span id="filterIntensityValue">60%</span></label>
+          <div class="filter-control" aria-label="Support strength control">
+            <label for="filterIntensityInput">Support strength: <span id="filterIntensityValue">Balanced</span></label>
+            <div class="strength-scale" aria-hidden="true">
+              <span>Minimal</span>
+              <span>Balanced</span>
+              <span>Strong</span>
+              <span>Maximum</span>
+            </div>
             <input id="filterIntensityInput" type="range" min="0" max="100" value="60">
-            <p id="preferencesStatus">Preferences saved locally</p>
           </div>
+
+          <p class="detection-summary" id="detectionSummary">Detection starts when support is activated.</p>
         </section>
 
-        <aside class="glass-panel status-panel" aria-label="AURA status">
-          <p>Selected enforcement: <span id="selectedModeStatus">The Voyager — Color Blind</span></p>
-          <p>Selected profile: <span id="selectedProfileStatus">General contrast support</span></p>
-          <p>Screen Enforcement: <span id="screenStatus">OFF</span></p>
-          <p>Active app: <span id="scannerApp">Waiting</span></p>
-          <p>Privacy: <span id="scannerPrivacy">local-first</span></p>
-          <p>Screenshots: <span id="screenshotStatus">not captured</span></p>
-          <p>Enforcement areas: <span id="enforcementAreaCount">0</span></p>
-          <p class="scanner-meta">Scan mode: <span id="scannerMode">IDLE</span> · Suggestions: <span id="scannerFixes">0</span></p>
-        </aside>
-
-        <article class="glass-panel report-panel" aria-label="Local Accessibility Report">
-          <h2>Local Accessibility Report</h2>
-          <p class="adaptation-note">Current version adapts by active app, selected accessibility profile, and Windows UI Automation areas when available.</p>
-          <p>Window: <span id="reportWindow">Unknown window</span></p>
-          <ul id="reportIssues">
-            <li>Start screen enforcement to run a local active-app scan.</li>
-          </ul>
-        </article>
-
-        <details class="glass-panel diagnostics-panel">
-          <summary>Scan Diagnostics</summary>
-          <button class="secondary-action diagnostics-action" id="testScanButton" type="button">Test Scan</button>
-          <div class="diagnostics-grid" aria-label="Scan diagnostics">
-            <p>Last scan time: <span id="diagScanTime">Never</span></p>
-            <p>Scan type: <span id="diagScanType">Waiting</span></p>
-            <p>Scan status: <span id="diagScanStatus">Waiting</span></p>
-            <p>Active app detected: <span id="diagActiveApp">Waiting</span></p>
-            <p>Window title: <span id="diagWindowTitle">Unknown window</span></p>
-            <p>Issues found: <span id="diagIssueCount">0</span></p>
-            <p>Last error: <span id="diagLastError">None</span></p>
-          </div>
-          <details class="raw-result-panel">
-            <summary>Raw scan result</summary>
-            <pre id="diagRawResult">No scan result yet.</pre>
-          </details>
-        </details>
       </section>
     </main>
 
-    <section class="lower-section" aria-label="Universal Empowerment">
-      <p class="section-kicker">Universal Empowerment</p>
-      <div class="subtle-grid">
-        <article>
-          <h2>Visual Enforcement</h2>
-          <p>Local filters help adjust contrast, glare, and focus visibility.</p>
-        </article>
-        <article>
-          <h2>Aura Narrative</h2>
-          <p>Profile guidance explains what support AURA is applying and why.</p>
-        </article>
-        <article>
-          <h2>Vision Core</h2>
-          <p>Desktop assistance stays local and avoids screenshot capture.</p>
-        </article>
+    <section class="about-view" id="aboutView" aria-labelledby="aboutTitle" hidden>
+      <div class="about-header">
+        <a class="brand" href="#" aria-label="AURA home">AURA</a>
+        <button class="summary-change" id="backToMainButton" type="button">Back to main</button>
       </div>
-    </section>
 
-    <footer class="site-footer">
-      &copy; 2026 Aura Systems. Part of the Tworam Ecosystem.
-    </footer>
+      <article class="glass-panel about-panel">
+        <h1 id="aboutTitle">What is AURA</h1>
+        <p>AURA is a local-first Windows accessibility assistant.</p>
+
+        <div class="about-grid">
+          <section>
+            <h2>Accessibility modes</h2>
+            <ul>
+              <li>Color Blind</li>
+              <li>Eye Strain</li>
+              <li>Low Vision</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2>Privacy</h2>
+            <ul>
+              <li>Local-first</li>
+              <li>No screenshots uploaded</li>
+              <li>No cloud processing required</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2>Detection</h2>
+            <ul>
+              <li>Windows UI Automation support</li>
+              <li>Experimental feature</li>
+              <li>Still being improved</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2>Shortcut</h2>
+            <p class="shortcut-text">Ctrl + Alt + A</p>
+          </section>
+        </div>
+      </article>
+    </section>
   </div>
 
   <script src="app.js"></script>

@@ -1,11 +1,11 @@
 {
   "name": "aura",
-  "version": "1.0.0",
+  "version": "0.3.0",
   "description": "AURA accessibility assistant prototype",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder --win portable"
+    "dist": "electron-builder --win"
   },
   "devDependencies": {
     "electron": "^42.3.1",
@@ -37,7 +37,8 @@
     ],
     "win": {
       "target": [
-        "portable"
+        "portable",
+        "nsis"
       ]
     }
   }

@@ -1,74 +1,106 @@
 # AURA
 
-AURA is a privacy-first accessibility assistant prototype for Windows.
+AURA is a local-first Windows accessibility assistant prototype. It helps users choose visual accessibility support, preview it inside the app, and apply a transparent local overlay to the desktop.
 
-## Project Status
+## Overview
 
-- AURA v1: visual reverse-engineered replica of the original dark futuristic demo.
-- AURA v2: real local active app detection through PowerShell and Electron IPC.
-- AURA v2.1: adaptive local accessibility profiles based on the detected app.
-- AURA v2.2: continuous local monitoring while Enforcer is active.
-- AURA v2.3: compact scanner/report UI that preserves the original AURA landing-page feeling.
-- AURA v2.4: real local transparent overlay window for accessibility filters.
-- AURA v3.0: automatic Windows UI Automation enforcement-area detection during active screen enforcement.
-- Roadmap step 2: create a portable Windows `.exe`.
-- Roadmap step 3: create the AURA download website.
-- Future: deeper content-aware local guidance through Windows accessibility APIs.
+AURA is built as an Electron desktop app with HTML, CSS, JavaScript, and local PowerShell scripts. It focuses on privacy-first accessibility support for color blindness, eye strain, and low vision.
 
-## Privacy Rules
+Version `0.3.0` is a teacher demo release focused on clear accessibility profiles, overlay support, local-first processing, and experimental reading-area detection.
 
-- Screenshots are not captured.
-- Screenshots are not saved.
-- Screenshots are not sent to AI.
-- Active app detection and accessibility profiles run locally.
-- Windows UI Automation scans read accessibility-tree metadata locally.
-- The external overlay does not modify other apps.
-- The external overlay places a transparent accessibility layer above the screen.
-- AI, if added later, should only receive safe summaries.
+## Features
 
-## Local Monitoring
+- Guided accessibility profile selection.
+- Live preview inside the AURA interface.
+- Transparent click-through screen overlay.
+- Support strength control.
+- Emergency shortcut: `Ctrl + Alt + A`.
+- Local active-window monitoring.
+- Experimental reading-area detection using Windows UI Automation metadata.
 
-When Aura Enforcer is active, AURA runs `active-window.ps1` and `ui-automation-scan.ps1` through Electron IPC every 3 seconds. The app name is matched against local JavaScript accessibility profiles, and Windows UI Automation is used when available to detect real enforcement areas from the active window's accessibility tree. The scanner, profile, suggestions, visual filter, and overlay rectangles are updated locally.
+## Accessibility Modes
 
-## Local Accessibility Overlay
+### The Voyager
 
-When Aura Enforcer is active, AURA shows a transparent, click-through Electron overlay above the screen. The overlay can help with color comfort, eye strain, and low vision by applying local visual filter layers:
+Color Blind support for color separation, contrast support, and reduced reliance on color-only cues.
 
-- Voyager: color-blind support feel with blue/purple focus guidance.
-- Guardian: warm dim comfort layer for eye strain.
-- Beacon: stronger high-contrast yellow/orange guidance.
+### The Guardian
 
-The overlay does not modify other apps. It does not capture, save, or send screenshots.
+Eye Strain support for warmer tones, softer contrast, reduced glare, and long-session comfort.
 
-## Windows UI Automation Enforcement Areas
+### The Beacon
 
-AURA v3.0 automatically runs `ui-automation-scan.ps1` during active screen enforcement. It uses Windows UI Automation to inspect accessible UI structure from the active foreground window when available.
+Low Vision support for stronger visibility, clearer focus, higher contrast, and screen guidance.
 
-The scan collects local metadata such as control names, control types, focusability, enabled state, automation IDs, and bounding rectangles. AURA uses local rules to flag possible accessibility concerns, including unnamed buttons, focusable controls without labels, tiny clickable areas, dense interfaces, and disabled important controls.
+## Privacy
 
-When UI Automation returns bounding rectangles, AURA sends those `enforcementAreas` to the transparent overlay and draws guidance rectangles only from that real local accessibility data. If no areas are available, AURA keeps the selected filter and edge frame active without drawing random boxes.
+AURA is designed to be local-first.
 
-No screenshots are captured, saved, uploaded, or sent to AI.
+- No screenshots are uploaded.
+- No screenshots are saved.
+- No cloud processing is required for current prototype features.
+- Active app detection runs locally.
+- Windows UI Automation metadata is processed locally.
+- The overlay does not modify other applications.
 
-## Portable Windows Build
+## Architecture
 
-Install dependencies, then run:
+AURA uses:
+
+- Electron for the desktop shell and transparent overlay window.
+- A renderer UI built with HTML, CSS, and JavaScript.
+- `preload.js` for safe IPC access from the frontend.
+- `main.js` for Electron windows, IPC handlers, and local PowerShell execution.
+- `active-window.ps1` for local active-window detection.
+- `ui-automation-scan.ps1` for experimental Windows UI Automation metadata scanning.
+
+The overlay is transparent, always on top, and click-through so users can continue using their desktop normally.
+
+## Installation
+
+For development, install dependencies:
 
 ```bash
 npm install
+```
+
+Start AURA:
+
+```bash
+npm start
+```
+
+## Building From Source
+
+Build Windows distribution files:
+
+```bash
 npm run dist
 ```
 
-The build target is a portable Windows executable using `electron-builder`.
+Electron Builder is configured to generate:
 
-Output:
+- Portable executable
+- NSIS installer
 
-```text
-release/AURA.exe
-```
-
-Depending on the electron-builder version, the portable file may also be named:
+Output is written to:
 
 ```text
-release/AURA Portable.exe
+release/
 ```
+
+## Roadmap
+
+- Add a custom AURA application icon for Windows builds.
+- Improve Windows UI Automation reading-area detection.
+- Refine overlay behavior for more applications.
+- Connect the placeholder download button to GitHub Releases when public builds are ready.
+- Continue improving local-first accessibility guidance.
+
+## Known Limitations
+
+- Reading area detection is experimental.
+- Some applications may not expose useful Windows UI Automation metadata.
+- The overlay applies visual support layers; it does not modify external applications.
+- AURA is a prototype and is not certified accessibility software.
+- AURA is not medical software and does not diagnose vision or health conditions.

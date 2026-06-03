@@ -11,13 +11,16 @@
     <div class="filter-layer"></div>
     <div class="edge-frame"></div>
     <div class="enforcement-area-layer" id="enforcementAreaLayer" aria-hidden="true"></div>
+    <div id="readingAreaFrame" class="reading-area-frame" aria-hidden="true">
+      <span>Reading area</span>
+    </div>
 
     <aside class="overlay-status" aria-label="AURA overlay status">
-      <p>AURA Enforcer Active</p>
-      <p>Status: <span id="overlayStatus">Waiting</span></p>
+      <p>AURA active</p>
+      <p><span id="overlayStatus">Waiting</span></p>
       <p>Mode: <span id="overlayMode">Voyager</span></p>
       <p>Profile: <span id="overlayProfile">Default Accessibility Profile</span></p>
-      <p>App: <span id="overlayApp">Waiting</span></p>
+      <p id="overlayAppRow">App: <span id="overlayApp">Waiting</span></p>
     </aside>
   </main>
 

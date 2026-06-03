@@ -2,7 +2,9 @@ const overlayMode = document.querySelector("#overlayMode");
 const overlayProfile = document.querySelector("#overlayProfile");
 const overlayStatus = document.querySelector("#overlayStatus");
 const overlayApp = document.querySelector("#overlayApp");
+const overlayAppRow = document.querySelector("#overlayAppRow");
 const enforcementAreaLayer = document.querySelector("#enforcementAreaLayer");
+const readingAreaFrame = document.querySelector("#readingAreaFrame");
 
 const overlayModeClasses = [
   "overlay-voyager",
@@ -33,10 +35,39 @@ const lowVisionClasses = [
 ];
 
 const modeLabels = {
-  voyager: "Voyager",
-  guardian: "Guardian",
-  beacon: "Beacon"
+  voyager: "Color Blind",
+  guardian: "Eye Strain",
+  beacon: "Low Vision"
 };
+
+function getDetectionStatusLabel(detectionStatus) {
+  const labels = {
+    "analyzing": "General support active",
+    "reading-area-detected": "Reading area detected",
+    "general-support": "General support active",
+    "detection-limited": "General support active"
+  };
+
+  return labels[detectionStatus] || "General support active";
+}
+
+function getFriendlyAppName(activeApp) {
+  const name = String(activeApp || "").replace(/\.exe$/i, "");
+
+  const knownNames = {
+    chrome: "Chrome",
+    firefox: "Firefox",
+    msedge: "Edge",
+    code: "Visual Studio Code",
+    discord: "Discord",
+    spotify: "Spotify",
+    notepad: "Notepad",
+    "notepad++": "Notepad++",
+    windowsterminal: "Windows Terminal"
+  };
+
+  return knownNames[name.toLowerCase()] || name;
+}
 
 function getSafeEnforcementAreas(areas) {
   if (!Array.isArray(areas)) {
@@ -83,6 +114,47 @@ function renderEnforcementAreas(areas) {
   });
 }
 
+function getSafeReadingArea(area) {
+  if (!area) {
+    return null;
+  }
+
+  const safeArea = {
+    x: Number(area.x),
+    y: Number(area.y),
+    width: Number(area.width),
+    height: Number(area.height)
+  };
+
+  if (
+    !Number.isFinite(safeArea.x) ||
+    !Number.isFinite(safeArea.y) ||
+    !Number.isFinite(safeArea.width) ||
+    !Number.isFinite(safeArea.height) ||
+    safeArea.width <= 0 ||
+    safeArea.height <= 0
+  ) {
+    return null;
+  }
+
+  return safeArea;
+}
+
+function renderReadingAreaFrame(area) {
+  const safeArea = getSafeReadingArea(area);
+
+  if (!safeArea) {
+    readingAreaFrame.hidden = true;
+    return;
+  }
+
+  readingAreaFrame.hidden = false;
+  readingAreaFrame.style.left = `${safeArea.x}px`;
+  readingAreaFrame.style.top = `${safeArea.y}px`;
+  readingAreaFrame.style.width = `${safeArea.width}px`;
+  readingAreaFrame.style.height = `${safeArea.height}px`;
+}
+
 function applyOverlayState(state) {
   console.log("Overlay update received:", state);
 
@@ -96,8 +168,13 @@ function applyOverlayState(state) {
     ? Math.min(100, Math.max(0, Number(state.filterIntensity)))
     : 60;
   const screenEnforcementActive = state?.screenEnforcementActive === true;
-  const scanStatus = state?.scanStatus || "Waiting";
-  const enforcementAreas = state?.enforcementAreas || [];
+  const detectionStatus = state?.detectionStatus || "general-support";
+  const primaryReadingArea = state?.primaryReadingArea || null;
+  const uiAutomationUsed = state?.uiAutomationUsed === true;
+  const elementCount = Number.isFinite(Number(state?.elementCount)) ? Number(state.elementCount) : 0;
+  const importantElementCount = Number.isFinite(Number(state?.importantElementCount))
+    ? Number(state.importantElementCount)
+    : 0;
 
   document.documentElement.style.setProperty("--filter-intensity", String(filterIntensity / 100));
   document.body.classList.toggle("screen-enforcement-active", screenEnforcementActive);
@@ -117,12 +194,23 @@ function applyOverlayState(state) {
   // Current AURA adapts dynamically based on selected profiles, active app scans,
   // and optional Windows UI Automation bounding rectangles. It does not inspect
   // screenshots or draw guessed external UI element positions.
-  renderEnforcementAreas(enforcementAreas);
+  renderEnforcementAreas([]);
+  renderReadingAreaFrame(primaryReadingArea);
 
-  overlayStatus.textContent = scanStatus;
+  const friendlyApp = getFriendlyAppName(activeApp);
+
+  console.log("Overlay detection state:", {
+    detectionStatus,
+    uiAutomationUsed,
+    elementCount,
+    importantElementCount
+  });
+
+  overlayStatus.textContent = getDetectionStatusLabel(detectionStatus);
   overlayMode.textContent = modeLabels[mode] || "Voyager";
   overlayProfile.textContent = profileName;
-  overlayApp.textContent = activeApp;
+  overlayApp.textContent = friendlyApp;
+  overlayAppRow.hidden = !friendlyApp || friendlyApp === "Waiting" || friendlyApp === "Unavailable";
 }
 
 // TODO: Use Windows UI Automation API to read real accessible UI elements.

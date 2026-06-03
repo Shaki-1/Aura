@@ -2,6 +2,15 @@ const { app, BrowserWindow, ipcMain, globalShortcut } = require("electron");
 const { execFile } = require("child_process");
 const path = require("path");
 
+if (!app.isPackaged) {
+  app.setPath("userData", path.join(__dirname, ".aura-user-data"));
+}
+
+app.disableHardwareAcceleration();
+app.commandLine.appendSwitch("disable-gpu");
+app.commandLine.appendSwitch("disable-gpu-compositing");
+app.commandLine.appendSwitch("disable-gpu-sandbox");
+
 let mainWindow = null;
 let overlayWindow = null;
 const scriptBasePath = app.isPackaged

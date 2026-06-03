@@ -77,6 +77,38 @@ body {
   opacity: calc(0.62 * max(var(--filter-intensity), 0.38));
 }
 
+.reading-area-frame {
+  position: fixed;
+  pointer-events: none;
+  border: 2px solid color-mix(in srgb, var(--frame-color) 92%, white);
+  border-radius: 14px;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.3),
+    0 0 22px color-mix(in srgb, var(--frame-color) 62%, transparent),
+    inset 0 0 18px color-mix(in srgb, var(--frame-color) 16%, transparent);
+  opacity: calc(0.92 * max(var(--filter-intensity), 0.42));
+}
+
+.reading-area-frame[hidden] {
+  display: none;
+}
+
+.reading-area-frame span {
+  position: absolute;
+  left: 12px;
+  top: -28px;
+  border: 1px solid color-mix(in srgb, var(--frame-color) 75%, white);
+  border-radius: 999px;
+  padding: 4px 9px;
+  color: rgba(255, 255, 255, 0.96);
+  background: rgba(2, 5, 15, 0.82);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--frame-color) 36%, transparent);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
 .overlay-status {
   position: fixed;
   right: 32px;
@@ -113,9 +145,10 @@ body {
 }
 
 .overlay-voyager {
-  --overlay-opacity: 0.2;
-  --frame-color: rgba(80, 174, 255, 0.56);
-  --frame-opacity: 0.36;
+  --overlay-opacity: 0.24;
+  --frame-color: rgba(53, 215, 230, 0.7);
+  --frame-opacity: 0.44;
+  --status-border: rgba(53, 215, 230, 0.34);
 }
 
 .overlay-voyager .filter-layer {
@@ -186,10 +219,10 @@ body {
 }
 
 .overlay-guardian {
-  --overlay-opacity: 0.34;
-  --frame-color: rgba(158, 169, 226, 0.34);
-  --frame-opacity: 0.2;
-  --status-border: rgba(166, 176, 231, 0.2);
+  --overlay-opacity: 0.38;
+  --frame-color: rgba(255, 179, 106, 0.42);
+  --frame-opacity: 0.24;
+  --status-border: rgba(255, 179, 106, 0.28);
   --status-bg: rgba(15, 12, 15, 0.42);
 }
 
@@ -248,10 +281,10 @@ body {
 }
 
 .overlay-beacon {
-  --overlay-opacity: 0.3;
-  --frame-color: rgba(255, 190, 36, 0.86);
-  --frame-opacity: 0.72;
-  --status-border: rgba(255, 195, 45, 0.44);
+  --overlay-opacity: 0.34;
+  --frame-color: rgba(255, 219, 85, 0.9);
+  --frame-opacity: 0.82;
+  --status-border: rgba(255, 219, 85, 0.52);
   --status-bg: rgba(18, 13, 2, 0.54);
 }
 
