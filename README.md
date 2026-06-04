@@ -1,108 +1,210 @@
+![Version](https://img.shields.io/badge/version-0.4.0-blue)
+![Platform](https://img.shields.io/badge/platform-Windows-blue)
+![Privacy](https://img.shields.io/badge/privacy-local--first-green)
+![Status](https://img.shields.io/badge/status-experimental-orange)
+
+[![Latest Release](https://img.shields.io/github/v/release/Shaki-1/Aura)](https://github.com/Shaki-1/Aura/releases/latest)
+
 # AURA
 
-AURA is a local-first Windows accessibility assistant prototype. It helps users choose visual accessibility support, preview it inside the app, and apply a transparent local overlay to the desktop.
+## Accessibility. Local-First. Windows.
 
-## Overview
+AURA is a local-first Windows accessibility assistant designed to improve visual comfort, focus, readability, and accessibility directly on the user's desktop.
 
-AURA is built as an Electron desktop app with HTML, CSS, JavaScript, and local PowerShell scripts. It focuses on privacy-first accessibility support for color blindness, eye strain, and low vision.
+Built with Electron, HTML, CSS, JavaScript, and Windows-native integrations, AURA provides visual accessibility support without requiring cloud processing or screenshot uploads.
 
-Version `0.3.0` is a teacher demo release focused on clear accessibility profiles, overlay support, local-first processing, and experimental reading-area detection.
+---
 
 ## Features
 
-- Guided accessibility profile selection.
-- Live preview inside the AURA interface.
-- Transparent click-through screen overlay.
-- Support strength control.
-- Emergency shortcut: `Ctrl + Alt + A`.
-- Local active-window monitoring.
-- Experimental reading-area detection using Windows UI Automation metadata.
+### Accessibility Profiles
 
-## Accessibility Modes
+#### Voyager — Color Blind Support
 
-### The Voyager
+* Improved contrast separation
+* Reduced reliance on color-only cues
+* Enhanced readability support
+* Visual distinction assistance
 
-Color Blind support for color separation, contrast support, and reduced reliance on color-only cues.
+#### Guardian — Eye Strain Support
 
-### The Guardian
+* Warmer visual comfort filters
+* Reduced visual fatigue
+* Softer screen guidance
+* Long-session viewing support
 
-Eye Strain support for warmer tones, softer contrast, reduced glare, and long-session comfort.
+#### Beacon — Low Vision Support
 
-### The Beacon
+* Stronger visibility enhancements
+* Reading-area focus support
+* Increased visual clarity
+* Improved screen guidance
 
-Low Vision support for stronger visibility, clearer focus, higher contrast, and screen guidance.
+---
 
-## Privacy
+## Detection Modes
 
-AURA is designed to be local-first.
+### Dynamic Detection
 
-- No screenshots are uploaded.
-- No screenshots are saved.
-- No cloud processing is required for current prototype features.
-- Active app detection runs locally.
-- Windows UI Automation metadata is processed locally.
-- Optional local visual layout detection is planned. If added, screenshots will be processed only in memory and will never be saved or uploaded.
-- The overlay does not modify other applications.
+AURA attempts to identify the active reading area using local detection technologies.
+
+Supports:
+
+* Windows UI Automation
+* Active window detection
+* Local visual layout analysis
+* Reading-area targeting
+
+### General Support
+
+Applies accessibility support across the entire screen without reading-area targeting.
+
+Useful when:
+
+* Detection is inaccurate
+* Applications expose limited metadata
+* Users prefer global support
+
+---
+
+## Local-First Privacy
+
+Privacy is a core design principle of AURA.
+
+### AURA does not:
+
+* Upload screenshots
+* Store screenshots
+* Send visual content to external services
+* Require cloud processing for accessibility support
+
+### AURA does:
+
+* Process accessibility information locally
+* Use Windows UI Automation metadata locally
+* Perform local visual analysis in memory
+* Keep users in control of accessibility support
+
+---
 
 ## Architecture
 
 AURA uses:
 
-- Electron for the desktop shell and transparent overlay window.
-- A renderer UI built with HTML, CSS, and JavaScript.
-- `preload.js` for safe IPC access from the frontend.
-- `main.js` for Electron windows, IPC handlers, and local PowerShell execution.
-- `active-window.ps1` for local active-window detection.
-- `ui-automation-scan.ps1` for experimental Windows UI Automation metadata scanning.
+### Desktop Application
 
-The overlay is transparent, always on top, and click-through so users can continue using their desktop normally.
+* Electron
+* HTML
+* CSS
+* JavaScript
+
+### Detection Components
+
+* Active Window Detection
+* Windows UI Automation
+* Local Vision Layout Analysis
+
+### Accessibility Enforcement
+
+* Profile-specific visual support
+* Reading-area enhancement
+* General screen support
+* Transparent click-through overlay
+
+### Overlay System
+
+The overlay is:
+
+* Transparent
+* Always on top
+* Click-through
+* Non-invasive
+
+Users can continue interacting with their applications normally.
+
+---
 
 ## Installation
 
-For development, install dependencies:
+### Development
+
+Install dependencies:
 
 ```bash
 npm install
 ```
 
-Start AURA:
+Run AURA:
 
 ```bash
 npm start
 ```
 
-## Building From Source
+---
 
-Build Windows distribution files:
+## Building
+
+Generate Windows releases:
 
 ```bash
 npm run dist
 ```
 
-Electron Builder is configured to generate:
-
-- Portable executable
-- NSIS installer
-
-Output is written to:
+Build output:
 
 ```text
 release/
 ```
 
-## Roadmap
+Generated packages:
 
-- Add a custom AURA application icon for Windows builds.
-- Improve Windows UI Automation reading-area detection.
-- Prototype optional local visual layout detection with in-memory-only screenshot analysis.
-- Refine overlay behavior for more applications.
-- Connect the placeholder download button to GitHub Releases when public builds are ready.
-- Continue improving local-first accessibility guidance.
+* Portable executable
+* NSIS installer
+
+---
+
+## Current Version
+
+**AURA v0.4.0**
+
+Highlights:
+
+* Dynamic and General support modes
+* Improved local vision support
+* Reading-area detection improvements
+* Better accessibility profile enforcement
+* Updated website and documentation
+* Portable and installer releases
+
+---
 
 ## Known Limitations
 
-- Reading area detection is experimental.
-- Some applications may not expose useful Windows UI Automation metadata.
-- The overlay applies visual support layers; it does not modify external applications.
-- AURA is a prototype and is not certified accessibility software.
-- AURA is not medical software and does not diagnose vision or health conditions.
+AURA is an experimental accessibility assistant currently under active development.
+
+Current limitations include:
+
+* Reading-area detection accuracy varies between applications
+* Google Docs support still requires refinement
+* Windows UI Automation availability depends on the application
+* Complex layouts may fall back to General Support mode
+
+---
+
+## Disclaimer
+
+AURA is not certified accessibility software.
+
+AURA is not medical software and does not diagnose, treat, or prevent medical conditions.
+
+Accessibility preferences and visual needs vary between users.
+
+---
+
+## License
+
+See the repository license for usage and distribution terms.
+
+---
+
+© 2026 Aura Systems
