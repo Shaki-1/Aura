@@ -14,10 +14,6 @@
           <a class="brand" href="#" aria-label="AURA home">AURA</a>
           <div class="brand-actions">
             <button class="about-button" id="aboutButton" type="button">About</button>
-            <!-- Future download URL:
-                 Replace this disabled button with an anchor pointing to GitHub Releases.
-                 Example: https://github.com/<owner>/<repo>/releases/latest -->
-            <button class="download-button" type="button" disabled aria-disabled="true">Coming Soon</button>
           </div>
         </div>
 
@@ -206,6 +202,19 @@
             <input id="filterIntensityInput" type="range" min="0" max="100" value="60">
           </div>
 
+          <fieldset class="detection-mode-control" aria-describedby="detectionModeHelp">
+            <legend>Detection mode</legend>
+            <label>
+              <input type="radio" name="detectionMode" value="dynamic" checked>
+              <span>Dynamic detection</span>
+            </label>
+            <label>
+              <input type="radio" name="detectionMode" value="general">
+              <span>General support</span>
+            </label>
+            <p id="detectionModeHelp">Dynamic tries to focus the active reading area. General applies support across the screen.</p>
+          </fieldset>
+
           <p class="detection-summary" id="detectionSummary">Detection starts when support is activated.</p>
         </section>
 
@@ -220,39 +229,43 @@
 
       <article class="glass-panel about-panel">
         <h1 id="aboutTitle">What is AURA</h1>
-        <p>AURA is a local-first Windows accessibility assistant.</p>
+        <p>
+          <span class="about-highlight">AURA is a local-first Windows accessibility assistant</span>
+          that helps make desktop work more comfortable through visual support profiles, screen overlay guidance, and local detection.
+        </p>
 
         <div class="about-grid">
           <section>
             <h2>Accessibility modes</h2>
             <ul>
-              <li>Color Blind</li>
-              <li>Eye Strain</li>
-              <li>Low Vision</li>
+              <li><strong>Color Blind:</strong> contrast and color separation support.</li>
+              <li><strong>Eye Strain:</strong> warmer, softer comfort filters.</li>
+              <li><strong>Low Vision:</strong> stronger focus and reading-area visibility.</li>
             </ul>
           </section>
 
           <section>
             <h2>Privacy</h2>
             <ul>
-              <li>Local-first</li>
-              <li>No screenshots uploaded</li>
-              <li>No cloud processing required</li>
+              <li>Local-first processing on your device.</li>
+              <li>No screenshots uploaded or stored.</li>
+              <li>Support is user-controlled and can be stopped instantly.</li>
             </ul>
           </section>
 
           <section>
             <h2>Detection</h2>
             <ul>
-              <li>Windows UI Automation support</li>
-              <li>Experimental feature</li>
-              <li>Still being improved</li>
+              <li>Uses Windows accessibility APIs when available.</li>
+              <li>Experimental reading-area detection is still improving.</li>
+              <li>Falls back to general profile support when needed.</li>
             </ul>
           </section>
 
           <section>
             <h2>Shortcut</h2>
             <p class="shortcut-text">Ctrl + Alt + A</p>
+            <p class="about-note">Immediately stops active screen enforcement.</p>
           </section>
         </div>
       </article>

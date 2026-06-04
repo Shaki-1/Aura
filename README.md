@@ -41,6 +41,7 @@ AURA is designed to be local-first.
 - No cloud processing is required for current prototype features.
 - Active app detection runs locally.
 - Windows UI Automation metadata is processed locally.
+- Optional local visual layout detection is planned. If added, screenshots will be processed only in memory and will never be saved or uploaded.
 - The overlay does not modify other applications.
 
 ## Architecture
@@ -93,6 +94,7 @@ release/
 
 - Add a custom AURA application icon for Windows builds.
 - Improve Windows UI Automation reading-area detection.
+- Prototype optional local visual layout detection with in-memory-only screenshot analysis.
 - Refine overlay behavior for more applications.
 - Connect the placeholder download button to GitHub Releases when public builds are ready.
 - Continue improving local-first accessibility guidance.

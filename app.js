@@ -3,6 +3,7 @@ const screenEnforcementButton = document.querySelector("#screenEnforcementButton
 const stopAllControl = document.querySelector("#stopAllControl");
 const filterIntensityInput = document.querySelector("#filterIntensityInput");
 const filterIntensityValue = document.querySelector("#filterIntensityValue");
+const detectionModeInputs = document.querySelectorAll("input[name='detectionMode']");
 const detectionSummary = document.querySelector("#detectionSummary");
 const mainView = document.querySelector("#mainView");
 const aboutView = document.querySelector("#aboutView");
@@ -186,6 +187,12 @@ const profileFilterClasses = [
   "filter-default"
 ];
 const workflowClasses = ["workflow-step-mode", "workflow-step-profile", "workflow-step-apply"];
+const READING_AREA_CONFIDENCE_THRESHOLD = 60;
+const LOCAL_VISION_TEXT_CLUSTER_CONFIDENCE_THRESHOLD = 55;
+// Temporary developer verification flag. This enables local vision only for the
+// current app session so we can prove whether in-memory layout detection runs
+// during enforcement. It is not persisted and has no public UI toggle.
+const ENABLE_LOCAL_VISION_DURING_ENFORCEMENT_TESTING = true;
 
 // selectedMode stores the chosen enforcement type after Step 1 is complete.
 let selectedMode = null;
@@ -196,6 +203,7 @@ let selectedColorVisionProfile = null;
 let selectedEyeStrainProfile = null;
 let selectedLowVisionProfile = null;
 let filterIntensity = 60;
+let detectionMode = "dynamic";
 let workflowStep = 1;
 let profileSelected = false;
 let modeDetailsExpanded = false;
@@ -217,6 +225,7 @@ let latestReport = null;
 let monitorIntervalId = null;
 let isScanning = false;
 let lastDetectedApp = null;
+let lastDetectedWindowTitle = null;
 let overlayScanStatus = "Waiting";
 let lastScanTime = "Never";
 let lastScanStatus = "Waiting";
@@ -232,6 +241,11 @@ let topImportantElements = [];
 let primaryReadingArea = null;
 let primaryReadingAreaReason = "UI Automation has not run yet.";
 let detectionStatus = "general-support";
+let scanSequenceId = 0;
+let activeScanSequenceId = null;
+let scanWatchdogId = null;
+let activityRefreshTimeoutId = null;
+let localVisionTestingEnabledThisSession = false;
 
 function normalizeAppName(activeApp) {
   const appName = activeApp || "";
@@ -302,7 +316,8 @@ const preferenceKeys = {
   selectedColorVisionProfile: "aura.selectedColorVisionProfile",
   selectedEyeStrainProfile: "aura.selectedEyeStrainProfile",
   selectedLowVisionProfile: "aura.selectedLowVisionProfile",
-  filterIntensity: "aura.filterIntensity"
+  filterIntensity: "aura.filterIntensity",
+  detectionMode: "aura.detectionMode"
 };
 
 function getSelectedProfileName() {
@@ -346,6 +361,7 @@ function loadPreferences() {
   selectedEyeStrainProfile = getStoredValue(preferenceKeys.selectedEyeStrainProfile, selectedEyeStrainProfile, Object.keys(eyeStrainLabels));
   selectedLowVisionProfile = getStoredValue(preferenceKeys.selectedLowVisionProfile, selectedLowVisionProfile, Object.keys(lowVisionLabels));
   filterIntensity = clampIntensity(localStorage.getItem(preferenceKeys.filterIntensity) || filterIntensity);
+  detectionMode = getStoredValue(preferenceKeys.detectionMode, detectionMode, ["dynamic", "general"]);
 }
 
 function savePreferences() {
@@ -366,6 +382,7 @@ function savePreferences() {
   }
 
   localStorage.setItem(preferenceKeys.filterIntensity, String(filterIntensity));
+  localStorage.setItem(preferenceKeys.detectionMode, detectionMode);
 }
 
 function getIntensityLabel(value) {
@@ -389,8 +406,16 @@ function getIntensityLabel(value) {
 function getOverlayPayload() {
   // Current AURA adapts dynamically based on the active application, selected
   // accessibility profile, and local Windows UI Automation rectangles when available.
+  const generalDetectionMode = detectionMode === "general";
+  const overlayPrimaryReadingArea = generalDetectionMode ? null : primaryReadingArea;
+  const overlayDetectionStatus = generalDetectionMode ? "general-support" : detectionStatus;
+  const overlayStatus = generalDetectionMode && screenEnforcementActive
+    ? "General support active"
+    : overlayScanStatus;
+
   return {
     mode: selectedMode || "voyager",
+    detectionMode,
     profileName: getSelectedProfileName(),
     filterClass: activeProfile.filterClass,
     activeApp: currentApp,
@@ -402,13 +427,13 @@ function getOverlayPayload() {
     selectedLowVisionProfile,
     filterIntensity,
     screenEnforcementActive,
-    scanStatus: overlayScanStatus,
-    detectionStatus,
+    scanStatus: overlayStatus,
+    detectionStatus: overlayDetectionStatus,
     uiAutomationUsed: Boolean(latestReport?.uiAutomationUsed),
     elementCount: lastElementCount,
     importantElementCount: lastImportantElementCount,
     enforcementAreas: latestEnforcementAreas,
-    primaryReadingArea
+    primaryReadingArea: overlayPrimaryReadingArea
   };
 }
 
@@ -438,6 +463,9 @@ function sendExternalOverlayUpdate(force = false) {
   }
 
   const payload = getOverlayPayload();
+  console.log("LOG_PRIMARY_AREA_BEFORE_OVERLAY_FORWARD:", primaryReadingArea);
+  console.log("LOG_PRIMARY_AREA_BEFORE_OVERLAY_FORWARD payload:", payload.primaryReadingArea);
+  console.log("Overlay payload primaryReadingArea:", payload.primaryReadingArea);
   console.log("Sending overlay scan status:", payload);
   window.auraAPI.updateOverlay(payload);
 }
@@ -556,7 +584,131 @@ function getImportantAccessibilityElements(elements) {
   return getTopAccessibilityAreas(elements);
 }
 
-function detectReadingArea(elements, activeApp = currentApp) {
+function getReadingAreaDiscardReason(area, context) {
+  const lowerName = String(area.name || "").toLowerCase();
+
+  if (!context.readingCandidateTypes.includes(area.type)) {
+    return "non-reading-control-type";
+  }
+
+  if (area.width <= 400 || area.height <= 250) {
+    return "too-small-for-reading-area";
+  }
+
+  if (context.blockedTypes.includes(area.type)) {
+    return "blocked-control-type";
+  }
+
+  if (area.height < 80) {
+    return "height-under-80";
+  }
+
+  if (lowerName.includes("toolbar") || lowerName.includes("tool bar")) {
+    return "toolbar-like-name";
+  }
+
+  if (lowerName.includes("menu")) {
+    return "menu-like-name";
+  }
+
+  if (lowerName.includes("tab")) {
+    return "tab-like-name";
+  }
+
+  if (lowerName.includes("status")) {
+    return "status-bar-like-name";
+  }
+
+  if (context.isGenericFullWindowFallback) {
+    return "generic-full-window-fallback";
+  }
+
+  if (area.score < 100) {
+    return "score-below-threshold";
+  }
+
+  return "candidate-kept";
+}
+
+function calculateReadingAreaConfidence(area) {
+  if (!area) {
+    return 0;
+  }
+
+  const screenWidth = window.screen?.width || window.innerWidth || 0;
+  const screenHeight = window.screen?.height || window.innerHeight || 0;
+  const lowerName = String(area.name || "").toLowerCase();
+  let confidence = 45;
+
+  if (["Document", "Edit", "Text"].includes(area.type)) {
+    confidence += 24;
+  } else if (["Pane", "Group", "Custom"].includes(area.type)) {
+    confidence -= 12;
+  }
+
+  if (area.hasKeyboardFocus) {
+    confidence += 14;
+  }
+
+  if (area.isKeyboardFocusable) {
+    confidence += 8;
+  }
+
+  if (area.width >= 500 && area.height >= 300) {
+    confidence += 12;
+  } else if (area.width >= 320 && area.height >= 180) {
+    confidence += 6;
+  }
+
+  if (area.y > 90) {
+    confidence += 6;
+  }
+
+  const coversMoreThan90Percent = (
+    screenWidth > 0 &&
+    screenHeight > 0 &&
+    area.width >= screenWidth * 0.9 &&
+    area.height >= screenHeight * 0.9
+  );
+
+  if (coversMoreThan90Percent) {
+    confidence -= 24;
+  }
+
+  if (!area.name) {
+    confidence -= 10;
+  }
+
+  if (area.isGenericFullWindowFallback) {
+    confidence -= 28;
+  }
+
+  if (
+    lowerName.includes("chrome legacy window") ||
+    lowerName.includes("root") ||
+    lowerName.includes("window")
+  ) {
+    confidence -= 18;
+  }
+
+  if (
+    lowerName.includes("toolbar") ||
+    lowerName.includes("tool bar") ||
+    lowerName.includes("menu") ||
+    lowerName.includes("tab") ||
+    lowerName.includes("status")
+  ) {
+    confidence -= 26;
+  }
+
+  if (area.y < 100) {
+    confidence -= 14;
+  }
+
+  return Math.max(0, Math.min(100, Math.round(confidence)));
+}
+
+function detectReadingArea(elements, activeApp = currentApp, windowTitle = "") {
   if (!Array.isArray(elements) || elements.length === 0) {
     primaryReadingAreaReason = "UI Automation returned no useful elements";
     return null;
@@ -573,7 +725,27 @@ function detectReadingArea(elements, activeApp = currentApp) {
   const readingCandidateTypes = ["Document", "Edit", "Text", "Pane", "Group", "Custom"];
   const blockedTypes = ["Button", "MenuItem", "TabItem", "ScrollBar"];
   const browserApps = ["chrome.exe", "msedge.exe", "firefox.exe"];
-  const isBrowserApp = browserApps.includes(String(activeApp || "").toLowerCase());
+  const normalizedApp = String(activeApp || "").toLowerCase();
+  const normalizedTitle = String(windowTitle || "").toLowerCase();
+  const isBrowserApp = browserApps.includes(normalizedApp);
+  const isVSCode = normalizedApp === "code.exe";
+  const isGoogleDocs = isBrowserApp && (
+    normalizedTitle.includes("google docs") ||
+    normalizedTitle.includes("docs.google") ||
+    normalizedTitle.includes("document")
+  );
+  const isDiscord = normalizedApp === "discord.exe";
+  const hasSpecificReadingCandidate = elements.some((element) => (
+    ["Document", "Edit", "Text"].includes(element.controlType) &&
+    element.width > 300 &&
+    element.height > 140
+  ));
+  const focusedEditableCandidate = elements.find((element) => (
+    element.hasKeyboardFocus &&
+    ["Document", "Edit", "Text", "Custom", "Group"].includes(element.controlType) &&
+    element.width > 260 &&
+    element.height > 120
+  ));
 
   const readingCandidates = elements.filter((element) => (
     readingCandidateTypes.includes(element.controlType) &&
@@ -593,7 +765,30 @@ function detectReadingArea(elements, activeApp = currentApp) {
       const lowerName = name.toLowerCase();
       const area = element.width * element.height;
       const isLargeCandidate = element.width > 400 && element.height > 250 && area > 100000;
-      const isCentralEnough = element.y >= 80 || element.height >= 360;
+      const isCentralEnough = element.y >= 110 || element.height >= 420;
+      const screenWidth = window.screen?.width || window.innerWidth || 0;
+      const screenHeight = window.screen?.height || window.innerHeight || 0;
+      const isVeryLargeRootLike = (
+        screenWidth > 0 &&
+        screenHeight > 0 &&
+        element.width >= screenWidth * 0.92 &&
+        element.height >= screenHeight * 0.82
+      );
+      const coversNearlyWholeScreen = (
+        screenWidth > 0 &&
+        screenHeight > 0 &&
+        element.width >= screenWidth * 0.95 &&
+        element.height >= screenHeight * 0.95
+      );
+      const isGenericFullWindowFallback = (
+        ["Pane", "Group", "Custom"].includes(type) &&
+        coversNearlyWholeScreen &&
+        (
+          !name ||
+          lowerName === "chrome legacy window" ||
+          lowerName.includes("chrome legacy window")
+        )
+      );
 
       score += Math.min(30, Math.floor(element.width / 80));
       score += Math.min(30, Math.floor(element.height / 60));
@@ -627,12 +822,48 @@ function detectReadingArea(elements, activeApp = currentApp) {
         score += 25;
       }
 
+      if (isGoogleDocs && isLargeCandidate && element.y > 120) {
+        score += 35;
+      }
+
+      if (focusedEditableCandidate && element === focusedEditableCandidate) {
+        score += 45;
+      }
+
+      if (isGoogleDocs && focusedEditableCandidate && element === focusedEditableCandidate) {
+        score += 35;
+      }
+
+      if (isVSCode && ["Document", "Edit", "Text"].includes(type) && isLargeCandidate) {
+        score += 30;
+      }
+
+      if (isVSCode && element.x > 180 && element.y > 70 && isLargeCandidate) {
+        score += 18;
+      }
+
       if (element.height < 120) {
         score -= 40;
       }
 
       if (element.y < 80 && element.height < 160) {
         score -= 45;
+      }
+
+      if ((isBrowserApp || isVSCode) && element.y < 110) {
+        score -= 40;
+      }
+
+      if (isGoogleDocs && element.y < 140) {
+        score -= 55;
+      }
+
+      if (isVSCode && element.x < 160 && element.width < 420) {
+        score -= 45;
+      }
+
+      if (isVSCode && lowerName.includes("minimap")) {
+        score -= 90;
       }
 
       if (blockedTypes.includes(type)) {
@@ -647,7 +878,9 @@ function detectReadingArea(elements, activeApp = currentApp) {
         lowerName.includes("toolbar") ||
         lowerName.includes("tool bar") ||
         lowerName.includes("menu") ||
-        lowerName.includes("tab")
+        lowerName.includes("tab") ||
+        lowerName.includes("title bar") ||
+        lowerName.includes("address")
       ) {
         score -= 60;
       }
@@ -664,6 +897,20 @@ function detectReadingArea(elements, activeApp = currentApp) {
         score -= 30;
       }
 
+      if (hasSpecificReadingCandidate && isVeryLargeRootLike && ["Pane", "Group", "Custom"].includes(type)) {
+        score -= 70;
+      }
+
+      if ((isDiscord || isBrowserApp) && isGenericFullWindowFallback && hasSpecificReadingCandidate) {
+        score -= 140;
+      } else if ((isDiscord || isBrowserApp) && isGenericFullWindowFallback) {
+        score -= 85;
+      }
+
+      if (isGoogleDocs && isVeryLargeRootLike && hasSpecificReadingCandidate) {
+        score -= 80;
+      }
+
       return {
         type,
         name,
@@ -671,18 +918,30 @@ function detectReadingArea(elements, activeApp = currentApp) {
         y: element.y,
         width: element.width,
         height: element.height,
-        score
+        hasKeyboardFocus: element.hasKeyboardFocus,
+        isKeyboardFocusable: element.isKeyboardFocusable,
+        score,
+        isGenericFullWindowFallback
       };
     })
-    .filter((area) => (
-      readingCandidateTypes.includes(area.type) &&
-      area.width > 400 &&
-      area.height > 250 &&
-      area.score >= 100
-    ))
+    .map((area) => ({
+      ...area,
+      discardReason: getReadingAreaDiscardReason(area, {
+        readingCandidateTypes,
+        blockedTypes,
+        isGenericFullWindowFallback: area.isGenericFullWindowFallback
+      })
+    }));
+
+  candidates.forEach((candidate, index) => {
+    console.log(`Reading area candidate ${index + 1}:`, candidate);
+  });
+
+  const keptCandidates = candidates
+    .filter((area) => area.discardReason === "candidate-kept")
     .sort((first, second) => second.score - first.score);
 
-  if (!candidates[0]) {
+  if (!keptCandidates[0]) {
     primaryReadingAreaReason = readingCandidates.length > 0
       ? "candidates scored too low"
       : "no Document/Edit/Text/Pane/Group/Custom candidate";
@@ -690,11 +949,16 @@ function detectReadingArea(elements, activeApp = currentApp) {
   }
 
   primaryReadingAreaReason = "primary reading area selected";
-  return candidates[0];
+  const selectedArea = {
+    ...keptCandidates[0],
+    confidence: calculateReadingAreaConfidence(keptCandidates[0])
+  };
+  console.log(`Selected reading area confidence: ${selectedArea.confidence}`);
+  return selectedArea;
 }
 
 function hasReadingArea() {
-  return Boolean(primaryReadingArea);
+  return detectionMode === "dynamic" && Boolean(primaryReadingArea);
 }
 
 function logDetectionSummary() {
@@ -795,6 +1059,7 @@ function logDetectionValidation({ activeApp, windowTitle }) {
     console.log(`- width: ${primaryReadingArea.width}`);
     console.log(`- height: ${primaryReadingArea.height}`);
     console.log(`- score: ${primaryReadingArea.score}`);
+    console.log(`- confidence: ${primaryReadingArea.confidence}`);
   } else {
     console.log("No primary reading area selected.");
     console.log("Reason:");
@@ -940,6 +1205,9 @@ function updateStatusPanel() {
   stopAllControl.hidden = !screenEnforcementActive;
   filterIntensityInput.value = String(filterIntensity);
   filterIntensityValue.textContent = getIntensityLabel(filterIntensity);
+  detectionModeInputs.forEach((input) => {
+    input.checked = input.value === detectionMode;
+  });
   screenEnforcementButton.textContent = screenEnforcementActive
     ? "Stop screen enforcement"
     : "Activate accessibility support";
@@ -951,6 +1219,10 @@ function updateStatusPanel() {
 function getDetectionSummaryText() {
   if (!screenEnforcementActive) {
     return "Detection starts when support is activated.";
+  }
+
+  if (detectionMode === "general") {
+    return "General support active.";
   }
 
   if (primaryReadingArea) {
@@ -967,21 +1239,222 @@ function updateScannerPanelFromProfile(result, profile) {
   latestReport = result;
 }
 
-async function runMonitoringCycle() {
-  if (isScanning) {
+function scheduleActivityRefresh(reason) {
+  if (!screenEnforcementActive) {
     return;
   }
 
+  if (activityRefreshTimeoutId) {
+    window.clearTimeout(activityRefreshTimeoutId);
+  }
+
+  activityRefreshTimeoutId = window.setTimeout(() => {
+    activityRefreshTimeoutId = null;
+    runMonitoringCycle(reason);
+  }, 450);
+}
+
+async function runLocalVisionVerification(scanId) {
+  const baseLog = {
+    localVisionEnabled: false,
+    "analyze-local-layout called": false,
+    "layoutAreas count": 0,
+    "best visual layout area": null,
+    "visual area usage": "ignored - local vision disabled"
+  };
+
+  if (!window.auraAPI || !window.auraAPI.analyzeLocalLayout) {
+    console.log(`[Scan #${scanId}] Local vision disabled`, baseLog);
+    return null;
+  }
+
+  try {
+    const result = await window.auraAPI.analyzeLocalLayout();
+    const layoutAreas = Array.isArray(result?.layoutAreas) ? result.layoutAreas : [];
+    const bestVisualLayoutArea = layoutAreas[0] || null;
+    const localVisionEnabled = Boolean(result?.enabled);
+    console.log("LOG_APP_RECEIVED_LOCAL_VISION:", {
+      layoutAreas,
+      bestLocalVisionArea: bestVisualLayoutArea
+    });
+
+    if (!localVisionEnabled) {
+      console.log(`[Scan #${scanId}] Local vision disabled`, {
+        ...baseLog,
+        "analyze-local-layout called": true
+      });
+      return result;
+    }
+
+    console.log(`[Scan #${scanId}] Local vision areas detected: ${layoutAreas.length}`, {
+      localVisionEnabled,
+      "analyze-local-layout called": true,
+      "layoutAreas count": layoutAreas.length,
+      "best visual layout area": bestVisualLayoutArea,
+      "visual area usage": bestVisualLayoutArea
+        ? "available for temporary comparison"
+        : "ignored - no visual area found"
+    });
+
+    return result;
+  } catch (error) {
+    console.warn(`[Scan #${scanId}] Local vision verification failed`, {
+      localVisionEnabled: "unknown",
+      "analyze-local-layout called": true,
+      "layoutAreas count": 0,
+      "best visual layout area": null,
+      "visual area usage": "ignored - diagnostic failed",
+      error: error.message
+    });
+    return null;
+  }
+}
+
+function formatAreaForComparison(area) {
+  if (!area) {
+    return {
+      x: null,
+      y: null,
+      width: null,
+      height: null,
+      confidence: 0
+    };
+  }
+
+  return {
+    x: Number(area.x || 0),
+    y: Number(area.y || 0),
+    width: Number(area.width || 0),
+    height: Number(area.height || 0),
+    confidence: Number(area.confidence || 0)
+  };
+}
+
+function normalizeLocalVisionReadingArea(localVisionResult) {
+  const layoutAreas = Array.isArray(localVisionResult?.layoutAreas)
+    ? localVisionResult.layoutAreas
+    : [];
+  const bestArea = layoutAreas[0];
+
+  if (!localVisionResult?.enabled || !bestArea) {
+    return null;
+  }
+
+  return {
+    type: bestArea.type || "visual-content-area",
+    name: "Local vision content area",
+    x: Number(bestArea.x || 0),
+    y: Number(bestArea.y || 0),
+    width: Number(bestArea.width || 0),
+    height: Number(bestArea.height || 0),
+    score: Number(bestArea.confidence || 0),
+    confidence: Number(bestArea.confidence || 0),
+    source: "local-vision"
+  };
+}
+
+function selectBestReadingArea(uiAutomationReadingArea, localVisionReadingArea) {
+  const screenWidth = window.screen?.width || window.innerWidth || 0;
+  const uiAutomationConfidence = Number(uiAutomationReadingArea?.confidence || 0);
+  const localVisionConfidence = Number(localVisionReadingArea?.confidence || 0);
+  const uiAutomationCoversWideScreen = Boolean(
+    uiAutomationReadingArea &&
+    screenWidth > 0 &&
+    Number(uiAutomationReadingArea.width || 0) > screenWidth * 0.85
+  );
+  const isLocalVisionTextBlock = localVisionReadingArea && localVisionReadingArea.type === "visual-text-block";
+  const localVisionHasGoodConfidence = localVisionConfidence >= READING_AREA_CONFIDENCE_THRESHOLD;
+
+  let selectedSource = "none";
+  let selectedArea = null;
+
+  if (uiAutomationReadingArea) {
+    selectedSource = "ui-automation";
+    selectedArea = {
+      ...uiAutomationReadingArea,
+      source: "ui-automation"
+    };
+  }
+
+  if (
+    localVisionReadingArea &&
+    (
+      !uiAutomationReadingArea ||
+      (isLocalVisionTextBlock && localVisionHasGoodConfidence) ||
+      localVisionConfidence > uiAutomationConfidence ||
+      uiAutomationCoversWideScreen
+    )
+  ) {
+    selectedSource = "local-vision";
+    selectedArea = localVisionReadingArea;
+  }
+
+  console.log("UI Automation area:", formatAreaForComparison(uiAutomationReadingArea));
+  console.log("Local Vision area:", formatAreaForComparison(localVisionReadingArea));
+  console.log("LOG_SELECTION_INPUT:", {
+    uiAutomationArea: uiAutomationReadingArea,
+    localVisionArea: localVisionReadingArea
+  });
+  console.log("Selected source:", selectedSource);
+  console.log("LOG_SELECTED_PRIMARY_AREA:", selectedArea ? {
+    type: selectedArea.type || null,
+    source: selectedArea.source || selectedSource,
+    x: selectedArea.x,
+    y: selectedArea.y,
+    width: selectedArea.width,
+    height: selectedArea.height,
+    confidence: selectedArea.confidence
+  } : null);
+
+  return {
+    selectedArea,
+    selectedSource
+  };
+}
+
+async function runMonitoringCycle(triggerReason = "manual request") {
+  const requestedScanId = scanSequenceId + 1;
+  console.log(`[Scan #${requestedScanId}] requested`, {
+    triggerReason,
+    isScanning,
+    lastDetectedApp: lastDetectedApp || "None",
+    lastDetectedWindowTitle: lastDetectedWindowTitle || "None"
+  });
+
+  if (isScanning) {
+    console.warn(`[Scan #${requestedScanId}] skipped because isScanning=true`, {
+      activeScanSequenceId,
+      triggerReason
+    });
+    return;
+  }
+
+  const scanId = ++scanSequenceId;
+  activeScanSequenceId = scanId;
   isScanning = true;
+  console.log(`[Scan #${scanId}] started`, { triggerReason });
+
+  scanWatchdogId = window.setTimeout(() => {
+    if (isScanning && activeScanSequenceId === scanId) {
+      console.error(`[Scan #${scanId}] Scan watchdog released stuck scan`, {
+        triggerReason,
+        lastDetectedApp: lastDetectedApp || "None",
+        lastDetectedWindowTitle: lastDetectedWindowTitle || "None"
+      });
+      isScanning = false;
+      activeScanSequenceId = null;
+      scanWatchdogId = null;
+    }
+  }, 10000);
+
   overlayScanStatus = "Scanning...";
-  detectionStatus = primaryReadingArea ? "reading-area-detected" : "general-support";
+  detectionStatus = primaryReadingArea ? "reading-area" : "general-support";
   latestEnforcementAreas = [];
   updateDiagnosticsState({
     type: "Active app + UI Automation scan",
     status: "Scanning",
     result: latestRawScanResult
   });
-  sendExternalOverlayUpdate();
 
   try {
     if (!window.auraAPI || !window.auraAPI.scanActiveWindow || !window.auraAPI.scanUIAutomation) {
@@ -992,28 +1465,161 @@ async function runMonitoringCycle() {
     // for the foreground app and Windows UI Automation for accessible element
     // bounds. It does not capture, save, upload, or send screenshots to AI.
     const activeWindowResult = await window.auraAPI.scanActiveWindow();
-    console.log("AURA active-window scan result:", activeWindowResult);
-    const uiAutomationResult = await window.auraAPI.scanUIAutomation();
-    console.log("AURA UI Automation scan result:", uiAutomationResult);
-
-    if (!screenEnforcementActive) {
+    if (activeScanSequenceId !== scanId) {
+      console.warn(`[Scan #${scanId}] completed after watchdog; ignoring late active-window result`);
       return;
     }
 
-    const activeApp = activeWindowResult.activeApp || uiAutomationResult.activeApp || "Unknown.exe";
+    console.log("AURA active-window scan result:", activeWindowResult);
+    console.log(`[Scan #${scanId}] active window`, {
+      activeApp: activeWindowResult.activeApp || "Unknown.exe",
+      activeWindowTitle: activeWindowResult.windowTitle || "Unknown window",
+      triggerReason
+    });
+
+    if (!screenEnforcementActive) {
+      console.log(`[Scan #${scanId}] completed`, {
+        reason: "screen enforcement stopped before UI Automation scan",
+        triggerReason
+      });
+      return;
+    }
+
+    const activeApp = activeWindowResult.activeApp || "Unknown.exe";
+    const activeWindowTitle = activeWindowResult.windowTitle || "Unknown window";
     const appChanged = activeApp !== lastDetectedApp;
+    const titleChanged = activeWindowTitle !== lastDetectedWindowTitle;
+    const activeWindowChanged = appChanged || titleChanged;
+    const effectiveTriggerReason = activeWindowChanged
+      ? appChanged && titleChanged
+        ? "active app and window title changed"
+        : appChanged
+          ? "active app changed"
+          : "active window title changed"
+      : triggerReason;
+
+    if (activeWindowChanged) {
+      console.log("AURA active window changed:", {
+        previousApp: lastDetectedApp || "None",
+        previousWindowTitle: lastDetectedWindowTitle || "None",
+        activeApp,
+        activeWindowTitle,
+        triggerReason: effectiveTriggerReason
+      });
+      currentApp = activeApp;
+      primaryReadingArea = null;
+      primaryReadingAreaReason = "active window changed; waiting for fresh UI Automation scan";
+      detectionStatus = "general-support";
+      overlayScanStatus = "Done";
+      latestEnforcementAreas = [];
+      sendExternalOverlayUpdate();
+    }
+
     lastDetectedApp = activeApp;
-    const profile = getProfileForApp(activeApp);
+    lastDetectedWindowTitle = activeWindowTitle;
+
+    const uiAutomationResult = await window.auraAPI.scanUIAutomation();
+    if (activeScanSequenceId !== scanId) {
+      console.warn(`[Scan #${scanId}] completed after watchdog; ignoring late UI Automation result`);
+      return;
+    }
+
+    console.log("AURA UI Automation scan result:", uiAutomationResult);
+    const localVisionResult = await runLocalVisionVerification(scanId);
+
+    if (!screenEnforcementActive) {
+      console.log(`[Scan #${scanId}] completed`, {
+        reason: "screen enforcement stopped after UI Automation scan",
+        triggerReason: effectiveTriggerReason
+      });
+      return;
+    }
+
+    const detectedApp = activeWindowResult.activeApp || uiAutomationResult.activeApp || "Unknown.exe";
+    const detectedWindowTitle = uiAutomationResult.windowTitle || activeWindowTitle;
+    const rawElements = Array.isArray(uiAutomationResult.rawElements) ? uiAutomationResult.rawElements : [];
+    if (String(detectedApp).toLowerCase() === "code.exe") {
+      console.log("VS Code root element:", uiAutomationResult.rootElement || null);
+      console.log("VS Code top 20 raw elements:");
+      console.table(rawElements);
+    }
+
+    if (rawElements.length > 0) {
+      console.log("UI Automation top raw elements discard reasons:");
+      console.table(rawElements.map((element, index) => ({
+        index: index + 1,
+        controlType: element.controlType,
+        name: element.name || "",
+        className: element.className || "",
+        width: element.width,
+        height: element.height,
+        x: element.x,
+        y: element.y,
+        discardReason: element.discardReason || "kept-for-filtering"
+      })));
+    }
+
+    const profile = getProfileForApp(detectedApp);
     accessibilityElements = normalizeAccessibilityElements(uiAutomationResult.elements);
     importantElements = getImportantAccessibilityElements(accessibilityElements);
     lastElementCount = accessibilityElements.length;
     lastImportantElementCount = importantElements.length;
     topImportantElements = importantElements.slice(0, 10);
-    primaryReadingArea = detectReadingArea(accessibilityElements, activeApp);
+    const uiAutomationReadingArea = detectReadingArea(accessibilityElements, detectedApp, detectedWindowTitle);
+    const localVisionReadingArea = normalizeLocalVisionReadingArea(localVisionResult);
+    console.log("LOG_LOCAL_VISION_SELECTED_AREA:", localVisionReadingArea);
+    console.log("LOG_UI_AUTOMATION_SELECTED_AREA:", uiAutomationReadingArea);
+    console.log("LOG_PRIMARY_AREA_BEFORE_MERGE:", {
+      currentPrimaryReadingArea: primaryReadingArea,
+      uiAutomationReadingArea,
+      localVisionReadingArea
+    });
+    const readingAreaSelection = selectBestReadingArea(uiAutomationReadingArea, localVisionReadingArea);
+    primaryReadingArea = readingAreaSelection.selectedArea;
+    console.log("LOG_PRIMARY_AREA_AFTER_MERGE:", {
+      selectedSource: readingAreaSelection.selectedSource,
+      selectedArea: readingAreaSelection.selectedArea,
+      primaryReadingArea
+    });
+    primaryReadingAreaReason = primaryReadingArea
+      ? `primary reading area selected from ${readingAreaSelection.selectedSource}`
+      : primaryReadingAreaReason;
+
+    const localVisionThresholdOverrideUsed = Boolean(
+      primaryReadingArea &&
+      primaryReadingArea.source === "local-vision" &&
+      primaryReadingArea.type === "visual-text-cluster" &&
+      primaryReadingArea.confidence >= LOCAL_VISION_TEXT_CLUSTER_CONFIDENCE_THRESHOLD &&
+      primaryReadingArea.confidence < READING_AREA_CONFIDENCE_THRESHOLD
+    );
+    console.log("LOCAL_VISION_THRESHOLD_OVERRIDE_USED", localVisionThresholdOverrideUsed);
+
+    if (
+      primaryReadingArea &&
+      primaryReadingArea.confidence < READING_AREA_CONFIDENCE_THRESHOLD &&
+      !localVisionThresholdOverrideUsed
+    ) {
+      console.log(`Reading area rejected due to low confidence: ${primaryReadingArea.confidence}`);
+      primaryReadingAreaReason = `confidence below threshold: ${primaryReadingArea.confidence}`;
+      primaryReadingArea = null;
+      detectionStatus = "general-support";
+    }
+    console.log("LOG_PRIMARY_AREA_AFTER_THRESHOLD:", primaryReadingArea);
+
+    console.log("AURA reading-area refresh:", {
+      activeApp: detectedApp,
+      activeWindowTitle: detectedWindowTitle,
+      elementCount: lastElementCount,
+      importantElementCount: lastImportantElementCount,
+      primaryReadingArea,
+      score: primaryReadingArea?.score || 0,
+      reason: primaryReadingArea ? "primary reading area selected" : primaryReadingAreaReason,
+      hasReadingArea: hasReadingArea()
+    });
     logDetectionSummary();
     logDetectionValidation({
-      activeApp,
-      windowTitle: uiAutomationResult.windowTitle || activeWindowResult.windowTitle || "Unknown window"
+      activeApp: detectedApp,
+      windowTitle: detectedWindowTitle || "Unknown window"
     });
 
     // Step 3 stores detected accessibility elements internally only.
@@ -1021,6 +1627,13 @@ async function runMonitoringCycle() {
     const areas = [];
     const uiAutomationLimited = Boolean(uiAutomationResult.error);
     const activeScanLimited = Boolean(activeWindowResult.error);
+    if (activeScanLimited || uiAutomationLimited) {
+      console.warn(`[Scan #${scanId}] scan failed or limited`, {
+        activeWindowError: activeWindowResult.error || "",
+        uiAutomationError: uiAutomationResult.error || "",
+        triggerReason: effectiveTriggerReason
+      });
+    }
     const mergedIssues = Array.isArray(uiAutomationResult.detectedIssues)
       ? uiAutomationResult.detectedIssues
       : [];
@@ -1032,10 +1645,10 @@ async function runMonitoringCycle() {
       detectionStatus = "general-support";
     } else if (primaryReadingArea) {
       scanStatus = "Reading area detected";
-      detectionStatus = "reading-area-detected";
+      detectionStatus = "reading-area";
     } else if (areas.length > 0) {
       scanStatus = "Areas detected";
-      detectionStatus = "reading-area-detected";
+      detectionStatus = "reading-area";
     } else if (lastElementCount > 0) {
       scanStatus = "Done";
       detectionStatus = "general-support";
@@ -1047,10 +1660,10 @@ async function runMonitoringCycle() {
     const mergedResult = {
       ...activeWindowResult,
       ...uiAutomationResult,
-      activeApp,
+      activeApp: detectedApp,
       windowTitle: uiAutomationLimited
-        ? activeWindowResult.windowTitle || uiAutomationResult.windowTitle || "Unknown window"
-        : uiAutomationResult.windowTitle || activeWindowResult.windowTitle || "Unknown window",
+        ? activeWindowTitle || uiAutomationResult.windowTitle || "Unknown window"
+        : detectedWindowTitle || activeWindowTitle || "Unknown window",
       privacyMode: "local-first",
       screenshotSentToAI: false,
       uiAutomationUsed: true,
@@ -1084,11 +1697,25 @@ async function runMonitoringCycle() {
     });
     sendExternalOverlayUpdate();
 
-    if (appChanged) {
-      console.log(`AURA active app changed: ${activeApp}`);
+    if (activeWindowChanged) {
+      console.log(`AURA overlay refreshed for active window: ${detectedApp} - ${detectedWindowTitle}`);
     }
 
+    console.log(`[Scan #${scanId}] completed`, {
+      activeApp: detectedApp,
+      activeWindowTitle: detectedWindowTitle,
+      triggerReason: effectiveTriggerReason,
+      scanStatus,
+      elementCount: lastElementCount,
+      importantElementCount: lastImportantElementCount,
+      hasReadingArea: hasReadingArea()
+    });
+
   } catch (error) {
+    console.error(`[Scan #${scanId}] failed`, {
+      error,
+      triggerReason
+    });
     console.error("AURA monitoring cycle failed:", error);
     overlayScanStatus = "Scan limited";
     detectionStatus = "general-support";
@@ -1107,7 +1734,21 @@ async function runMonitoringCycle() {
     });
     sendExternalOverlayUpdate();
   } finally {
-    isScanning = false;
+    if (scanWatchdogId && activeScanSequenceId === scanId) {
+      window.clearTimeout(scanWatchdogId);
+      scanWatchdogId = null;
+    }
+
+    if (activeScanSequenceId === scanId) {
+      isScanning = false;
+      activeScanSequenceId = null;
+    }
+
+    console.log(`[Scan #${scanId}] lifecycle finished`, {
+      isScanning,
+      activeScanSequenceId,
+      triggerReason
+    });
     render();
   }
 }
@@ -1118,19 +1759,41 @@ function startMonitoring() {
   }
 
   console.log("AURA monitoring started");
+  const startInitialMonitoringCycle = () => runMonitoringCycle("screen enforcement started");
 
   if (window.auraAPI && window.auraAPI.showOverlay) {
     window.auraAPI.showOverlay();
     sendExternalOverlayUpdate();
   }
 
-  runMonitoringCycle();
+  if (
+    ENABLE_LOCAL_VISION_DURING_ENFORCEMENT_TESTING &&
+    !localVisionTestingEnabledThisSession &&
+    window.auraAPI &&
+    window.auraAPI.enableLocalVisionForTesting
+  ) {
+    window.auraAPI.enableLocalVisionForTesting()
+      .then((result) => {
+        localVisionTestingEnabledThisSession = Boolean(result?.enabled);
+        console.log("Local vision testing enabled for enforcement verification:", {
+          localVisionEnabled: localVisionTestingEnabledThisSession,
+          persisted: Boolean(result?.persisted)
+        });
+        startInitialMonitoringCycle();
+      })
+      .catch((error) => {
+        console.warn("Local vision testing could not be enabled:", error.message);
+        startInitialMonitoringCycle();
+      });
+  } else {
+    startInitialMonitoringCycle();
+  }
 
   monitorIntervalId = setInterval(() => {
     if (screenEnforcementActive) {
-      runMonitoringCycle();
+      runMonitoringCycle("periodic refresh");
     }
-  }, 3000);
+  }, 2000);
 }
 
 function stopMonitoring() {
@@ -1147,6 +1810,17 @@ function stopMonitoring() {
 
   screenEnforcementActive = false;
   isScanning = false;
+  if (scanWatchdogId) {
+    window.clearTimeout(scanWatchdogId);
+    scanWatchdogId = null;
+  }
+
+  if (activityRefreshTimeoutId) {
+    window.clearTimeout(activityRefreshTimeoutId);
+    activityRefreshTimeoutId = null;
+  }
+
+  activeScanSequenceId = null;
   overlayScanStatus = "Waiting";
   detectionStatus = "general-support";
   latestEnforcementAreas = [];
@@ -1157,6 +1831,7 @@ function stopMonitoring() {
   topImportantElements = [];
   primaryReadingArea = null;
   lastDetectedApp = null;
+  lastDetectedWindowTitle = null;
 }
 
 function emergencyStop() {
@@ -1260,6 +1935,17 @@ function updateFilterIntensity(value) {
   savePreferences();
   render();
   sendExternalOverlayUpdate();
+}
+
+function updateDetectionMode(value) {
+  if (!["dynamic", "general"].includes(value)) {
+    return;
+  }
+
+  detectionMode = value;
+  savePreferences();
+  render();
+  sendExternalOverlayUpdate(true);
 }
 
 function render() {
@@ -1376,6 +2062,14 @@ filterIntensityInput.addEventListener("input", (event) => {
   updateFilterIntensity(event.target.value);
 });
 
+detectionModeInputs.forEach((input) => {
+  input.addEventListener("change", (event) => {
+    if (event.target.checked) {
+      updateDetectionMode(event.target.value);
+    }
+  });
+});
+
 document.addEventListener("keydown", (event) => {
   if (event.ctrlKey && event.altKey && event.key.toLowerCase() === "a") {
     event.preventDefault();
@@ -1386,6 +2080,133 @@ document.addEventListener("keydown", (event) => {
 if (window.auraAPI && window.auraAPI.onEmergencyStop) {
   window.auraAPI.onEmergencyStop(emergencyStop);
 }
+
+if (window.auraAPI && window.auraAPI.onInputActivity) {
+  window.auraAPI.onInputActivity((payload) => {
+    const reason = payload?.reason || "input activity";
+    scheduleActivityRefresh(reason);
+  });
+}
+
+async function runUIAutomationDiagnostic() {
+  if (!window.auraAPI || !window.auraAPI.diagnoseUIAutomation) {
+    console.error("AURA UI Automation diagnostic unavailable. Start the app with Electron.");
+    return null;
+  }
+
+  console.group("AURA UI Automation Diagnostic");
+
+  try {
+    const result = await window.auraAPI.diagnoseUIAutomation();
+
+    console.log("Active app:", result.activeApp);
+    console.log("Active window title:", result.windowTitle);
+    console.log("PowerShell script path used:", result.scriptPath);
+    console.log("ui-automation-scan.ps1 exists:", result.scriptExists);
+    console.log("PowerShell exit code:", result.exitCode);
+    console.log("Raw stdout length:", result.rawStdoutLength);
+    console.log("Raw stderr:", result.rawStderr || "(empty)");
+    console.log("Parsed element count:", result.parsedElementCount);
+    const caret = result.caret || result.parsed?.caret || { available: false };
+
+    if (caret.available) {
+      console.log("Current caret detected:");
+      console.log("x:", caret.x);
+      console.log("y:", caret.y);
+      console.log("width:", caret.width);
+      console.log("height:", caret.height);
+      console.log("source control type:", caret.sourceControlType || "(unknown)");
+      console.log("source name:", caret.sourceName || "(empty)");
+    } else {
+      console.log("Caret not available.");
+    }
+
+    if (result.powerShellError) {
+      console.error("PowerShell failed. Exact command used:", result.command);
+      console.error("PowerShell error:", result.powerShellError);
+    }
+
+    if (result.parseError) {
+      console.error("JSON parsing failed:", result.parseError);
+      console.log("First 1000 characters of raw stdout:", result.rawStdoutPreview || "(empty)");
+    }
+
+    console.log("First 10 parsed elements:");
+    console.table(result.firstTenElements || []);
+    console.log("Full diagnostic result:", result);
+
+    return result;
+  } catch (error) {
+    console.error("AURA UI Automation diagnostic crashed:", error);
+    return null;
+  } finally {
+    console.groupEnd();
+  }
+}
+
+async function runLocalVisionDiagnostic() {
+  if (!window.auraAPI || !window.auraAPI.analyzeLocalLayout) {
+    console.error("AURA local vision diagnostic unavailable. Start the app with Electron.");
+    return null;
+  }
+
+  console.group("AURA Local Vision Diagnostic");
+
+  try {
+    const result = await window.auraAPI.analyzeLocalLayout();
+    const layoutAreas = Array.isArray(result?.layoutAreas) ? result.layoutAreas : [];
+
+    if (!result?.enabled) {
+      console.info("Local vision disabled");
+    }
+
+    console.log("enabled:", Boolean(result?.enabled));
+    console.log("usedScreenshot:", Boolean(result?.usedScreenshot));
+    console.log("savedScreenshot:", Boolean(result?.savedScreenshot));
+    console.log("uploadedScreenshot:", Boolean(result?.uploadedScreenshot));
+    console.log("width:", Number(result?.width || 0));
+    console.log("height:", Number(result?.height || 0));
+    console.log("layoutAreas count:", layoutAreas.length);
+
+    if (layoutAreas.length > 0) {
+      console.table(layoutAreas);
+    } else {
+      console.log("layoutAreas table:", []);
+    }
+
+    if (result?.error) {
+      console.warn("Local vision error:", result.error);
+    }
+
+    return result;
+  } catch (error) {
+    console.error("AURA local vision diagnostic failed:", error);
+    return null;
+  } finally {
+    console.groupEnd();
+  }
+}
+
+async function enableLocalVisionForTesting() {
+  if (!window.auraAPI || !window.auraAPI.enableLocalVisionForTesting) {
+    console.error("AURA local vision testing helper unavailable. Start the app with Electron.");
+    return null;
+  }
+
+  const result = await window.auraAPI.enableLocalVisionForTesting();
+  console.info("Local vision enabled for this app session only. This setting is not saved.", result);
+  return result;
+}
+
+window.auraDiagnostics = {
+  runUIScan: runUIAutomationDiagnostic,
+  runLocalVision: runLocalVisionDiagnostic,
+  enableLocalVisionForTesting
+};
+
+console.info(
+  "AURA diagnostics ready. Run window.auraDiagnostics.runUIScan() or window.auraDiagnostics.runLocalVision()."
+);
 
 loadPreferences();
 render();

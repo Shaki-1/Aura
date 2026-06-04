@@ -25,7 +25,10 @@ body {
 .overlay-root,
 .filter-layer,
 .edge-frame,
-.enforcement-area-layer {
+.enforcement-area-layer,
+.reading-area-focus,
+.reading-area-spotlight,
+.reading-area-feather {
   position: fixed;
   inset: 0;
   pointer-events: none;
@@ -80,13 +83,61 @@ body {
 .reading-area-frame {
   position: fixed;
   pointer-events: none;
-  border: 2px solid color-mix(in srgb, var(--frame-color) 92%, white);
+  border: 2px solid color-mix(in srgb, var(--frame-color) 72%, white);
   border-radius: 14px;
   box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.3),
-    0 0 22px color-mix(in srgb, var(--frame-color) 62%, transparent),
-    inset 0 0 18px color-mix(in srgb, var(--frame-color) 16%, transparent);
-  opacity: calc(0.92 * max(var(--filter-intensity), 0.42));
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 0 18px color-mix(in srgb, var(--frame-color) 36%, transparent);
+  opacity: calc(0.68 * max(var(--filter-intensity), 0.45));
+}
+
+.reading-area-focus {
+  --focus-x: 50vw;
+  --focus-y: 50vh;
+  --focus-width: 0px;
+  --focus-height: 0px;
+  --outside-dim: rgba(0, 0, 0, 0.18);
+  opacity: calc(max(var(--filter-intensity), 0.36));
+  background:
+    linear-gradient(to right, var(--outside-dim) 0 var(--focus-x), transparent var(--focus-x) calc(var(--focus-x) + var(--focus-width)), var(--outside-dim) calc(var(--focus-x) + var(--focus-width)) 100vw),
+    linear-gradient(to bottom, var(--outside-dim) 0 var(--focus-y), transparent var(--focus-y) calc(var(--focus-y) + var(--focus-height)), var(--outside-dim) calc(var(--focus-y) + var(--focus-height)) 100vh);
+}
+
+.reading-area-focus[hidden] {
+  display: none;
+}
+
+.reading-area-spotlight[hidden] {
+  display: none;
+}
+
+.reading-area-feather[hidden] {
+  display: none;
+}
+
+.spotlight-panel {
+  position: fixed;
+  pointer-events: none;
+  background: rgba(0, 0, 0, calc(0.5 + (var(--filter-intensity) * 0.2)));
+}
+
+.reading-area-feather {
+  --feather-x: 50vw;
+  --feather-y: 50vh;
+  --feather-width: 0px;
+  --feather-height: 0px;
+  left: var(--feather-x);
+  top: var(--feather-y);
+  width: var(--feather-width);
+  height: var(--feather-height);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, calc(0.06 * max(var(--filter-intensity), 0.45)));
+  box-shadow:
+    0 0 0 9999px rgba(0, 0, 0, 0),
+    0 0 46px 22px rgba(255, 255, 255, calc(0.11 * max(var(--filter-intensity), 0.45))),
+    0 0 70px 34px color-mix(in srgb, var(--frame-color) 24%, transparent),
+    inset 0 0 44px rgba(255, 255, 255, calc(0.08 * max(var(--filter-intensity), 0.45)));
+  mix-blend-mode: screen;
 }
 
 .reading-area-frame[hidden] {
@@ -145,16 +196,26 @@ body {
 }
 
 .overlay-voyager {
-  --overlay-opacity: 0.24;
+  --overlay-opacity: 0.18;
   --frame-color: rgba(53, 215, 230, 0.7);
+  --outside-dim: rgba(0, 20, 34, 0.08);
   --frame-opacity: 0.44;
   --status-border: rgba(53, 215, 230, 0.34);
 }
 
+.overlay-voyager .reading-area-frame {
+  border-color: rgba(67, 239, 231, 0.94);
+  border-style: solid;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 0 18px rgba(53, 215, 230, 0.34),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
 .overlay-voyager .filter-layer {
   background:
-    linear-gradient(90deg, rgba(23, 104, 235, 0.3), rgba(126, 88, 232, 0.16)),
-    radial-gradient(circle at 72% 42%, rgba(0, 225, 255, 0.14), transparent 38%);
+    linear-gradient(90deg, rgba(23, 104, 235, 0.22), rgba(126, 88, 232, 0.1)),
+    radial-gradient(circle at 72% 42%, rgba(0, 225, 255, 0.1), transparent 38%);
   mix-blend-mode: screen;
 }
 
@@ -201,8 +262,8 @@ body {
 
 .overlay-voyager.color-achromatopsia .filter-layer {
   background:
-    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.1) 0 1px, transparent 1px 10px),
-    rgba(0, 0, 0, 0.18);
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.08) 0 1px, transparent 1px 12px),
+    rgba(0, 0, 0, 0.13);
   mix-blend-mode: normal;
 }
 
@@ -219,17 +280,31 @@ body {
 }
 
 .overlay-guardian {
-  --overlay-opacity: 0.38;
-  --frame-color: rgba(255, 179, 106, 0.42);
+  --overlay-opacity: 0.3;
+  --frame-color: rgba(255, 179, 106, 0.62);
+  --outside-dim: rgba(38, 20, 6, 0.1);
   --frame-opacity: 0.24;
   --status-border: rgba(255, 179, 106, 0.28);
   --status-bg: rgba(15, 12, 15, 0.42);
 }
 
+.overlay-guardian .reading-area-focus {
+  background:
+    linear-gradient(to right, var(--outside-dim) 0 var(--focus-x), rgba(255, 190, 110, 0.035) var(--focus-x) calc(var(--focus-x) + var(--focus-width)), var(--outside-dim) calc(var(--focus-x) + var(--focus-width)) 100vw),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.08) 0 var(--focus-y), transparent var(--focus-y) calc(var(--focus-y) + var(--focus-height)), rgba(0, 0, 0, 0.08) calc(var(--focus-y) + var(--focus-height)) 100vh);
+}
+
+.overlay-guardian .reading-area-frame {
+  border-color: rgba(255, 188, 118, 0.86);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.07),
+    0 0 15px rgba(255, 179, 106, 0.28);
+}
+
 .overlay-guardian .filter-layer {
   background:
-    linear-gradient(180deg, rgba(255, 178, 91, 0.28), rgba(42, 24, 10, 0.24)),
-    rgba(0, 0, 0, 0.16);
+    linear-gradient(180deg, rgba(255, 178, 91, 0.22), rgba(42, 24, 10, 0.18)),
+    rgba(0, 0, 0, 0.1);
 }
 
 .overlay-guardian.eye-warm-comfort {
@@ -242,7 +317,7 @@ body {
 }
 
 .overlay-guardian.eye-dim-focus {
-  --overlay-opacity: 0.38;
+  --overlay-opacity: 0.42;
   --frame-opacity: 0.16;
 }
 
@@ -269,23 +344,97 @@ body {
 }
 
 .overlay-guardian.eye-night-session {
-  --overlay-opacity: 0.42;
+  --overlay-opacity: 0.48;
   --frame-color: rgba(218, 142, 72, 0.28);
   --frame-opacity: 0.18;
 }
 
 .overlay-guardian.eye-night-session .filter-layer {
   background:
-    linear-gradient(180deg, rgba(255, 151, 64, 0.28), rgba(0, 0, 0, 0.32)),
-    rgba(0, 0, 0, 0.22);
+    linear-gradient(180deg, rgba(255, 151, 64, 0.3), rgba(0, 0, 0, 0.38)),
+    rgba(0, 0, 0, 0.24);
+}
+
+.has-reading-area.overlay-guardian.eye-dim-focus .spotlight-panel,
+.has-reading-area.overlay-guardian.eye-night-session .spotlight-panel {
+  background: rgba(20, 10, 4, calc(0.2 + (var(--filter-intensity) * 0.24)));
+}
+
+.has-reading-area.overlay-guardian.eye-reduced-motion .reading-area-feather,
+.has-reading-area.overlay-guardian.eye-soft-contrast .reading-area-feather {
+  box-shadow:
+    0 0 22px 10px rgba(255, 168, 88, calc(0.08 * max(var(--filter-intensity), 0.35))),
+    inset 0 0 18px rgba(255, 216, 160, calc(0.04 * max(var(--filter-intensity), 0.35)));
 }
 
 .overlay-beacon {
   --overlay-opacity: 0.34;
   --frame-color: rgba(255, 219, 85, 0.9);
+  --outside-dim: rgba(0, 0, 0, 0.4);
   --frame-opacity: 0.82;
   --status-border: rgba(255, 219, 85, 0.52);
   --status-bg: rgba(18, 13, 2, 0.54);
+}
+
+.overlay-beacon .reading-area-frame {
+  border-width: 2px;
+  border-color: rgba(255, 216, 82, 0.94);
+  border-radius: 12px;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 0 22px rgba(255, 210, 54, 0.42),
+    inset 0 0 24px rgba(255, 246, 170, 0.1);
+}
+
+.has-reading-area .filter-layer {
+  opacity: calc(0.03 * var(--filter-intensity));
+}
+
+.has-reading-area .reading-area-focus {
+  display: none;
+}
+
+.has-reading-area .edge-frame {
+  opacity: calc(0.22 * max(var(--filter-intensity), 0.3));
+}
+
+.has-reading-area.overlay-voyager .filter-layer {
+  opacity: calc(0.1 * var(--filter-intensity));
+}
+
+.has-reading-area.overlay-voyager .spotlight-panel {
+  background: rgba(0, 18, 28, calc(0.08 + (var(--filter-intensity) * 0.1)));
+}
+
+.has-reading-area.overlay-voyager .reading-area-feather {
+  background: rgba(255, 255, 255, calc(0.035 * max(var(--filter-intensity), 0.35)));
+  box-shadow:
+    0 0 28px 10px rgba(53, 215, 230, calc(0.18 * max(var(--filter-intensity), 0.35))),
+    inset 0 0 0 2px rgba(255, 255, 255, calc(0.12 * max(var(--filter-intensity), 0.35)));
+}
+
+.has-reading-area.overlay-guardian .spotlight-panel {
+  background: rgba(28, 14, 4, calc(0.12 + (var(--filter-intensity) * 0.16)));
+}
+
+.has-reading-area.overlay-guardian .reading-area-feather {
+  background: rgba(255, 202, 140, calc(0.035 * max(var(--filter-intensity), 0.35)));
+  box-shadow:
+    0 0 30px 14px rgba(255, 168, 88, calc(0.12 * max(var(--filter-intensity), 0.35))),
+    inset 0 0 24px rgba(255, 216, 160, calc(0.055 * max(var(--filter-intensity), 0.35)));
+}
+
+.has-reading-area.overlay-beacon .spotlight-panel {
+  background: rgba(0, 0, 0, calc(0.42 + (var(--filter-intensity) * 0.28)));
+}
+
+.has-reading-area.overlay-beacon .reading-area-feather {
+  background: rgba(255, 255, 255, calc(0.085 * max(var(--filter-intensity), 0.45)));
+  box-shadow:
+    0 0 0 9999px rgba(0, 0, 0, 0),
+    0 0 50px 24px rgba(255, 255, 255, calc(0.12 * max(var(--filter-intensity), 0.45))),
+    0 0 78px 38px rgba(255, 217, 74, calc(0.28 * max(var(--filter-intensity), 0.45))),
+    inset 0 0 46px rgba(255, 255, 255, calc(0.1 * max(var(--filter-intensity), 0.45)));
 }
 
 .overlay-beacon .filter-layer {
@@ -321,7 +470,7 @@ body {
 }
 
 .overlay-beacon.low-reading-support {
-  --overlay-opacity: 0.22;
+  --overlay-opacity: 0.24;
   --frame-opacity: 0.52;
 }
 
@@ -341,7 +490,7 @@ body {
 }
 
 .overlay-beacon.low-maximum-visibility {
-  --overlay-opacity: 0.38;
+  --overlay-opacity: 0.44;
   --frame-color: rgba(255, 220, 72, 0.96);
   --frame-opacity: 0.94;
 }
@@ -357,4 +506,21 @@ body {
   box-shadow:
     inset 0 0 68px rgba(255, 197, 38, 0.5),
     0 0 32px rgba(255, 197, 38, 0.52);
+}
+
+.has-reading-area.overlay-beacon.low-large-focus .reading-area-frame,
+.has-reading-area.overlay-beacon.low-maximum-visibility .reading-area-frame {
+  border-width: 3px;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.16),
+    0 0 30px rgba(255, 210, 54, 0.58),
+    inset 0 0 30px rgba(255, 246, 170, 0.14);
+}
+
+.has-reading-area.overlay-beacon.low-maximum-visibility .spotlight-panel {
+  background: rgba(0, 0, 0, calc(0.52 + (var(--filter-intensity) * 0.32)));
+}
+
+.has-reading-area.overlay-beacon.low-reading-support .spotlight-panel {
+  background: rgba(0, 0, 0, calc(0.3 + (var(--filter-intensity) * 0.18)));
 }

@@ -4,6 +4,9 @@ const overlayStatus = document.querySelector("#overlayStatus");
 const overlayApp = document.querySelector("#overlayApp");
 const overlayAppRow = document.querySelector("#overlayAppRow");
 const enforcementAreaLayer = document.querySelector("#enforcementAreaLayer");
+const readingAreaFocus = document.querySelector("#readingAreaFocus");
+const readingAreaSpotlight = document.querySelector("#readingAreaSpotlight");
+const readingAreaFeather = document.querySelector("#readingAreaFeather");
 const readingAreaFrame = document.querySelector("#readingAreaFrame");
 
 const overlayModeClasses = [
@@ -40,9 +43,20 @@ const modeLabels = {
   beacon: "Low Vision"
 };
 
-function getDetectionStatusLabel(detectionStatus) {
+function getDetectionStatusLabel(detectionStatus, mode, hasReadingArea) {
+  if (hasReadingArea) {
+    const targetedLabels = {
+      voyager: "Color support active",
+      guardian: "Eye comfort active",
+      beacon: "Reading support active"
+    };
+
+    return targetedLabels[mode] || "Reading support active";
+  }
+
   const labels = {
     "analyzing": "General support active",
+    "reading-area": "Reading area detected",
     "reading-area-detected": "Reading area detected",
     "general-support": "General support active",
     "detection-limited": "General support active"
@@ -119,6 +133,8 @@ function getSafeReadingArea(area) {
     return null;
   }
 
+  const viewportWidth = window.innerWidth || 0;
+  const viewportHeight = window.innerHeight || 0;
   const safeArea = {
     x: Number(area.x),
     y: Number(area.y),
@@ -137,15 +153,95 @@ function getSafeReadingArea(area) {
     return null;
   }
 
+  safeArea.x = Math.max(0, safeArea.x);
+  safeArea.y = Math.max(0, safeArea.y);
+
+  if (viewportWidth > 0) {
+    safeArea.width = Math.min(safeArea.width, Math.max(0, viewportWidth - safeArea.x));
+  }
+
+  if (viewportHeight > 0) {
+    safeArea.height = Math.min(safeArea.height, Math.max(0, viewportHeight - safeArea.y));
+  }
+
+  if (safeArea.width <= 0 || safeArea.height <= 0) {
+    return null;
+  }
+
   return safeArea;
 }
 
-function renderReadingAreaFrame(area) {
+function renderReadingAreaFrame(area, mode, detectionStatus) {
   const safeArea = getSafeReadingArea(area);
+  console.log("Overlay readingAreaFrame exists:", Boolean(readingAreaFrame));
+  console.log("Overlay readingAreaFocus exists:", Boolean(readingAreaFocus));
+  console.log("Overlay readingAreaSpotlight exists:", Boolean(readingAreaSpotlight));
+  console.log("Overlay readingAreaFeather exists:", Boolean(readingAreaFeather));
+  console.log("Overlay safe primaryReadingArea:", safeArea);
+  const spotlightActive = detectionStatus === "reading-area" && Boolean(safeArea);
 
   if (!safeArea) {
     readingAreaFrame.hidden = true;
+    readingAreaFocus.hidden = true;
+    readingAreaSpotlight.hidden = true;
+    readingAreaFeather.hidden = true;
+    console.log("Overlay readingAreaFrame hidden: true");
     return;
+  }
+
+  readingAreaFocus.hidden = false;
+  readingAreaFocus.style.setProperty("--focus-x", `${safeArea.x}px`);
+  readingAreaFocus.style.setProperty("--focus-y", `${safeArea.y}px`);
+  readingAreaFocus.style.setProperty("--focus-width", `${safeArea.width}px`);
+  readingAreaFocus.style.setProperty("--focus-height", `${safeArea.height}px`);
+
+  const viewportWidth = window.innerWidth || 0;
+  const viewportHeight = window.innerHeight || 0;
+  const rightEdge = safeArea.x + safeArea.width;
+  const bottomEdge = safeArea.y + safeArea.height;
+
+  if (spotlightActive) {
+    const spotlightPanels = {
+      top: readingAreaSpotlight.querySelector(".spotlight-top"),
+      bottom: readingAreaSpotlight.querySelector(".spotlight-bottom"),
+      left: readingAreaSpotlight.querySelector(".spotlight-left"),
+      right: readingAreaSpotlight.querySelector(".spotlight-right")
+    };
+
+    readingAreaSpotlight.hidden = false;
+    spotlightPanels.top.style.left = "0px";
+    spotlightPanels.top.style.top = "0px";
+    spotlightPanels.top.style.width = `${viewportWidth}px`;
+    spotlightPanels.top.style.height = `${safeArea.y}px`;
+
+    spotlightPanels.bottom.style.left = "0px";
+    spotlightPanels.bottom.style.top = `${bottomEdge}px`;
+    spotlightPanels.bottom.style.width = `${viewportWidth}px`;
+    spotlightPanels.bottom.style.height = `${Math.max(0, viewportHeight - bottomEdge)}px`;
+
+    spotlightPanels.left.style.left = "0px";
+    spotlightPanels.left.style.top = `${safeArea.y}px`;
+    spotlightPanels.left.style.width = `${safeArea.x}px`;
+    spotlightPanels.left.style.height = `${safeArea.height}px`;
+
+    spotlightPanels.right.style.left = `${rightEdge}px`;
+    spotlightPanels.right.style.top = `${safeArea.y}px`;
+    spotlightPanels.right.style.width = `${Math.max(0, viewportWidth - rightEdge)}px`;
+    spotlightPanels.right.style.height = `${safeArea.height}px`;
+
+    readingAreaFeather.hidden = false;
+    readingAreaFeather.style.setProperty("--feather-x", `${safeArea.x}px`);
+    readingAreaFeather.style.setProperty("--feather-y", `${safeArea.y}px`);
+    readingAreaFeather.style.setProperty("--feather-width", `${safeArea.width}px`);
+    readingAreaFeather.style.setProperty("--feather-height", `${safeArea.height}px`);
+    console.log("Spotlight active");
+    console.log("Spotlight area width/height:", {
+      width: safeArea.width,
+      height: safeArea.height
+    });
+  } else {
+    readingAreaSpotlight.hidden = true;
+    readingAreaFeather.hidden = true;
   }
 
   readingAreaFrame.hidden = false;
@@ -153,12 +249,20 @@ function renderReadingAreaFrame(area) {
   readingAreaFrame.style.top = `${safeArea.y}px`;
   readingAreaFrame.style.width = `${safeArea.width}px`;
   readingAreaFrame.style.height = `${safeArea.height}px`;
+  console.log("Overlay readingAreaFrame CSS applied:", {
+    left: readingAreaFrame.style.left,
+    top: readingAreaFrame.style.top,
+    width: readingAreaFrame.style.width,
+    height: readingAreaFrame.style.height,
+    hidden: readingAreaFrame.hidden
+  });
 }
 
 function applyOverlayState(state) {
   console.log("Overlay update received:", state);
 
   const mode = state?.mode || "voyager";
+  const detectionMode = state?.detectionMode === "general" ? "general" : "dynamic";
   const profileName = state?.profileName || "Default Accessibility Profile";
   const activeApp = state?.activeApp || "Waiting";
   const colorVisionProfile = state?.selectedColorVisionProfile || state?.colorVisionProfile || "contrast-boost";
@@ -168,8 +272,12 @@ function applyOverlayState(state) {
     ? Math.min(100, Math.max(0, Number(state.filterIntensity)))
     : 60;
   const screenEnforcementActive = state?.screenEnforcementActive === true;
-  const detectionStatus = state?.detectionStatus || "general-support";
-  const primaryReadingArea = state?.primaryReadingArea || null;
+  const detectionStatus = detectionMode === "general"
+    ? "general-support"
+    : state?.detectionStatus || "general-support";
+  const primaryReadingArea = detectionMode === "general"
+    ? null
+    : state?.primaryReadingArea || null;
   const uiAutomationUsed = state?.uiAutomationUsed === true;
   const elementCount = Number.isFinite(Number(state?.elementCount)) ? Number(state.elementCount) : 0;
   const importantElementCount = Number.isFinite(Number(state?.importantElementCount))
@@ -178,6 +286,7 @@ function applyOverlayState(state) {
 
   document.documentElement.style.setProperty("--filter-intensity", String(filterIntensity / 100));
   document.body.classList.toggle("screen-enforcement-active", screenEnforcementActive);
+  document.body.classList.toggle("has-reading-area", Boolean(getSafeReadingArea(primaryReadingArea)));
   document.body.classList.remove(...overlayModeClasses);
   document.body.classList.add(`overlay-${mode}`);
   document.body.classList.remove(...colorVisionClasses);
@@ -195,18 +304,36 @@ function applyOverlayState(state) {
   // and optional Windows UI Automation bounding rectangles. It does not inspect
   // screenshots or draw guessed external UI element positions.
   renderEnforcementAreas([]);
-  renderReadingAreaFrame(primaryReadingArea);
+  console.log("Overlay received primaryReadingArea:", primaryReadingArea);
+  console.log("LOG_OVERLAY_RECEIVED_PRIMARY_AREA:", primaryReadingArea ? {
+    type: primaryReadingArea.type || null,
+    source: primaryReadingArea.source || null,
+    x: primaryReadingArea.x,
+    y: primaryReadingArea.y,
+    width: primaryReadingArea.width,
+    height: primaryReadingArea.height
+  } : null);
+  if (primaryReadingArea) {
+    console.log("Overlay received primaryReadingArea bounds:", {
+      x: primaryReadingArea.x,
+      y: primaryReadingArea.y,
+      width: primaryReadingArea.width,
+      height: primaryReadingArea.height
+    });
+  }
+  renderReadingAreaFrame(primaryReadingArea, mode, detectionStatus);
 
   const friendlyApp = getFriendlyAppName(activeApp);
 
   console.log("Overlay detection state:", {
+    detectionMode,
     detectionStatus,
     uiAutomationUsed,
     elementCount,
     importantElementCount
   });
 
-  overlayStatus.textContent = getDetectionStatusLabel(detectionStatus);
+  overlayStatus.textContent = getDetectionStatusLabel(detectionStatus, mode, Boolean(getSafeReadingArea(primaryReadingArea)));
   overlayMode.textContent = modeLabels[mode] || "Voyager";
   overlayProfile.textContent = profileName;
   overlayApp.textContent = friendlyApp;
